@@ -116,6 +116,48 @@ def get_coords_sess(base_data_path, monkey, date):
 
     return ap_coord, dv_coord, ml_coord, ang, depth_start
 
+def gen_meta_behavior(base_data_path, monkey):
+    folders = os_sorted(Path.Path(base_data_path, monkey).glob(monkey + '*'))
+    df_behavior = []
+    columns_behavior = ['sub', 'date','behavior file', 'scenefile']
+    for folder in folders:
+        # get meta info on all behavior files in the path 
+        date_str = Path.Path(folder).name.split('_')[1]
+        behav_file_list= os_sorted(Path.Path(folder).glob('*.json'))
+        if len(behav_file_list) == 0:
+            print('no behavior file in this folder')
+            for b_f in behav_file_list:
+                m = json.load(open(b_f,'rb'))
+                if m['TASK']['RewardStage'] == 1:
+                    scenefile = m['TASK']['ImageBagsSample']
+                else:
+                    scenefile = 'calibration'
+                df_behavior.append([monkey, date_str, b_f.stem,scenefile ])         
+
+    df_behavior = pd.DataFrame(df_behavior, columns = columns_behavior)
+
+    return df_behavior 
+
+def update_meta_behavior(base_data_path,monkey,df_behavior):
+    folders = os_sorted(Path.Path(base_data_path, monkey).glob(monkey + '*'))
+    all_dates = [Path.Path(folder).name.split('_')[1] for folder in folders]
+    dates_diff = set(list(map(str,df_behavior['date']))).symmetric_difference(all_dates)
+
+    for date in dates_diff:
+        folder  = os_sorted(Path.Path(base_data_path,monkey).glob('*' + date + '*'))[0]
+        behav_file_list= os_sorted(Path.Path(folder).glob('*.json'))
+        if len(behav_file_list) == 0:
+            print('no behavior file in this folder')
+            for b_f in behav_file_list:
+                m = json.load(open(b_f,'rb'))
+                if m['TASK']['RewardStage'] == 1:
+                    scenefile = m['TASK']['ImageBagsSample']
+                else:
+                    scenefile = 'calibration'
+                df_behavior.append([monkey, date, b_f.stem,scenefile ])     
+
+    return df_behavior
+
 def init_dirs(base_data_path, monkey, date, base_save_out_path):
 
     data_path = get_recording_path(base_data_path, monkey, date)
