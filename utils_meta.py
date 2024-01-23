@@ -63,6 +63,23 @@ def get_stims_sess(base_data_path, monkey, date):
 
     return np.unique(np.array(stims))
 
+def get_allsess_scenefile(base_data_path,monkey,scenefile_list):
+    folders = os_sorted([f for f in next(os.walk(base_data_path/monkey))[1] if monkey in f])
+
+    allsess = []
+    for f in folders:
+        date = f.split('_')[1]
+        data_path = get_recording_path(base_data_path, monkey, date,depth = 3)
+        n_recordings = len(data_path)
+        for dp in data_path:
+            scenefiles_sess = get_scenefiles_sess(base_data_path, monkey, date)
+
+            if len(set(scenefiles_sess).intersection(scenefile_list))>0:
+                allsess.append(f)
+                print(f)
+
+    return allsess
+
 def get_allsess_stim(base_data_path,monkey,stim_list):
     folders = os_sorted([f for f in next(os.walk(base_data_path/monkey))[1] if monkey in f])
 
