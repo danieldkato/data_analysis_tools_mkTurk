@@ -445,7 +445,7 @@ def gen_short_scene_info(scene_df):
             '_posZ_' +  str(scene_df.loc[obj]['posZ']) + '_targetX_' + str(scene_df.loc[obj]['targetX']) + \
             '_targetY_' + str(scene_df.loc[obj]['targetY']) + '_targetZ_' + str(scene_df.loc[obj]['targetZ']) 
 
-    imgFilter = scene_df[scene_df['filterVal'].notna()].index
+    imgFilter = scene_df[(scene_df['filterVal'].notna()) & (scene_df['filterVal'] != "")].index
     for imgF in imgFilter:
         imgF_name = imgF
         if scene_df_short != '':
