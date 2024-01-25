@@ -425,6 +425,16 @@ def gen_short_scene_info(scene_df):
                 obj_name = '_' + obj_name
             scene_df_short = scene_df_short + obj_name + obj.split('bkg')[1] + \
             '_sz_' + str(scene_df.loc[obj]['size']) 
+
+    for obj in visible_objs:
+        if 'light' in obj:
+            obj_name = obj
+            if scene_df_short != '':
+                obj_name = '_' + obj_name
+            scene_df_short = scene_df_short + obj_name +\
+            '_posX_' + str(scene_df.loc[obj]['posX']) + '_posY_' + str(scene_df.loc[obj]['posY']) + \
+            '_posZ_' +  str(scene_df.loc[obj]['posZ'])
+
     for obj in visible_objs:
         if 'cam' in obj:
             obj_name = obj
