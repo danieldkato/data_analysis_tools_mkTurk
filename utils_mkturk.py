@@ -407,7 +407,7 @@ def gen_short_scene_info(scene_df):
     # object , background then camera
     scene_df_short = ''
     for obj in visible_objs:
-        if 'bkg' not in obj and 'light' not in obj and 'cam' not in obj:
+        if 'bkg' not in obj and 'light' not in obj and 'camera' not in obj:
             str_ = scene_df.loc[obj]['meta'].split('/')
             obj_name = str_[len(str_)-2] + '/' + str_[len(str_)-1]
             if scene_df_short != '':
@@ -436,7 +436,7 @@ def gen_short_scene_info(scene_df):
             '_posZ_' +  str(scene_df.loc[obj]['posZ'])
 
     for obj in visible_objs:
-        if 'cam' in obj:
+        if 'camera' in obj:
             obj_name = obj
             if scene_df_short != '':
                 obj_name = '_' + obj_name
