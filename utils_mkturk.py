@@ -94,6 +94,7 @@ def gen_scene_df(scenefile):
         # CAMERAS
         cam_df = pd.DataFrame(index = all_cam_ids,columns = columns)
         for cam in all_cam_ids:
+            cam_df = pd.DataFrame(index = all_cam_ids,columns = columns)
             # posititon
             posX = scenefile["CAMERAS"][cam]["position"]['x']
 
@@ -166,6 +167,7 @@ def gen_scene_df(scenefile):
         obj_df = pd.DataFrame(index = all_obj_ids, columns = columns)
         
         for obj in all_obj_ids:
+            obj_df.loc[obj]['type'] = 'object'
             # size
             try: 
                 size = scenefile["OBJECTS"][obj]["sizeTHREEJS"]
@@ -255,6 +257,7 @@ def gen_scene_df(scenefile):
         light_df = pd.DataFrame(index = all_light_ids, columns = columns)
         
         for light in all_light_ids:
+            
             # posititon
             posX = scenefile["LIGHTS"][light]["position"]['x']
 
@@ -293,6 +296,8 @@ def gen_scene_df(scenefile):
         bkg_df = pd.DataFrame(index = all_bkg_ids, columns = columns)
 
         if len(all_bkg_ids) != 0: # background is present in the scenefile
+            for bkg_id in all_bkg_ids:
+                bkg_df.loc[bkg_id]['type'] = 'background'
             if n_s <len(bkg_new):
                 if bkg_new[n_s] != -1:
                     bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = 1
@@ -315,6 +320,7 @@ def gen_scene_df(scenefile):
         # IMAGEFILTERS 
         imgf_df = pd.DataFrame(index = all_imgf_ids, columns = columns)
         for imgf in all_imgf_ids:
+            imgf_df.loc[imgf]['type'] = 'imgFilter'
             if len(scenefile['IMAGEFILTERS'][imgf.split('_')[1]]) > 0:
                 try: 
                     imgf_df.loc[imgf]['filterVal']= scenefile['IMAGEFILTERS'][imgf.split('_')[1]][n_s]
@@ -324,6 +330,7 @@ def gen_scene_df(scenefile):
         # OBJECTFILTERS
         objf_df = pd.DataFrame(index = all_objf_ids, columns = columns)
         for objf in all_objf_ids:
+            objf_df.loc[objf]['type'] = 'objFilter'
             if len(scenefile['OBJECTFILTERS'][objf.split('_')[1]]) > 0:
                 try:
                     objf_df.loc[objf]['filterVal']= scenefile['OBJECTFILTERS'][objf.split('_')[1]][n_s]
@@ -407,7 +414,7 @@ def gen_short_scene_info(scene_df):
     # object , background then camera
     scene_df_short = ''
     for obj in visible_objs:
-        if 'bkg' not in obj and 'light' not in obj and 'camera' not in obj:
+        if scene_df.loc[obj]['type'] == 'object':
             str_ = scene_df.loc[obj]['meta'].split('/')
             obj_name = str_[len(str_)-2] + '/' + str_[len(str_)-1]
             if scene_df_short != '':
@@ -418,7 +425,7 @@ def gen_short_scene_info(scene_df):
             '_posZ_' +  str(scene_df.loc[obj]['posZ']) + '_rotX_' + str(scene_df.loc[obj]['rotX']) + \
             '_rotY_' + str(scene_df.loc[obj]['rotY']) + '_rotZ_' + str(scene_df.loc[obj]['rotZ']) 
     for obj in visible_objs:
-        if 'bkg' in obj:
+        if scene_df.loc[obj]['type'] == 'background':
             str_ = scene_df.loc[obj]['meta'].split('/')
             obj_name = str_[len(str_)-2] + '/' + str_[len(str_)-1]
             if scene_df_short != '':
@@ -427,7 +434,7 @@ def gen_short_scene_info(scene_df):
             '_sz_' + str(scene_df.loc[obj]['size']) 
 
     for obj in visible_objs:
-        if 'light' in obj:
+        if scene_df.loc[obj]['type'] == 'light':
             obj_name = obj
             if scene_df_short != '':
                 obj_name = '_' + obj_name
@@ -436,7 +443,7 @@ def gen_short_scene_info(scene_df):
             '_posZ_' +  str(scene_df.loc[obj]['posZ'])
 
     for obj in visible_objs:
-        if 'camera' in obj:
+        if scene_df.loc[obj]['type'] == 'camera':
             obj_name = obj
             if scene_df_short != '':
                 obj_name = '_' + obj_name
