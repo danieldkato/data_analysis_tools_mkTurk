@@ -45,7 +45,7 @@ def gen_scene_df(scenefile):
     except:
         n_scenes = getLongestArray(scenefile)
     
-    columns = ['size', 'posX', 'posY', 'posZ', 'targetX', 'targetY', 'targetZ', 'rotX', 'rotY', 'rotZ', 'visibility', 'filterVal', 'meta', 'dur']
+    columns = ['type','size', 'posX', 'posY', 'posZ', 'targetX', 'targetY', 'targetZ', 'rotX', 'rotY', 'rotZ', 'visibility', 'filterVal', 'meta', 'dur']
     # columns are properties of objects
 
     # rows are objects in a scene, including lights and background if they exist 
@@ -94,7 +94,7 @@ def gen_scene_df(scenefile):
         # CAMERAS
         cam_df = pd.DataFrame(index = all_cam_ids,columns = columns)
         for cam in all_cam_ids:
-            cam_df = pd.DataFrame(index = all_cam_ids,columns = columns)
+            cam_df.loc[cam]['type'] = 'camera'
             # posititon
             posX = scenefile["CAMERAS"][cam]["position"]['x']
 
@@ -257,7 +257,7 @@ def gen_scene_df(scenefile):
         light_df = pd.DataFrame(index = all_light_ids, columns = columns)
         
         for light in all_light_ids:
-            
+            light_df.loc[light]['type'] = 'light'
             # posititon
             posX = scenefile["LIGHTS"][light]["position"]['x']
 
