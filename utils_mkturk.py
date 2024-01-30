@@ -401,7 +401,7 @@ def create_data_mat(file):
         data_dict[n]['reward'] = m['TRIALEVENTS']['NReward'][data_dict[n]['trial_num']]
         data_dict[n]['reward_dur'] = m['TASK']['RewardDuration']
         data_dict[n]['punish_dur'] = m['TASK']['PunishTimeOut']
-        data_dict[n]['iti_dur'] = m['TASK']['InterTrialInterval']
+        data_dict[n]['iti_dur'] = m['TASK']['SampleOFF']
         data_dict[n]['prestim_dur'] =m['TASK']['SamplePRE']
 
     return data_dict
