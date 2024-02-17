@@ -20,7 +20,7 @@ functions for processing and analyzing mkTurk datafiles and electrophysiology da
 
 
 ## Pipeline: from multiunit data to psth per channel 
-  After you have multiunit and trig files data ready,
+  After you have multiunit and trigger data ready,
 1) run **get_data_dict_from_mkturk.ipynb**
 2) upload both **analyze_bystim.py** and **analyze_bystim.sh** to the GPU cluster
 3) edit **analyze_bystim.sh** with appropriate date and monkey
