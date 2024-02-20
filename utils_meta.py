@@ -7,12 +7,13 @@ import re
 from natsort import os_sorted
 import pickle
 import json
-from utils_mkturk import * 
+from data_analysis_tools_mkTurk.utils_mkturk import * 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
     # given the base data path, monkey, and date,
     # returns the filepath where the spikeglx binary files are stored
-    long_path = next((base_data_path/monkey).glob('*' + date + '*'))
+    print(Path.Path(base_data_path,monkey))
+    long_path = next(Path.Path(base_data_path,monkey).glob('*' + date + '*'))
     
     sub_lists = [x[0] for x in os.walk(long_path) if len(Path.Path(x[0]).parents)-len(Path.Path(base_data_path).parents) ==depth]
     filepath = []
@@ -99,10 +100,9 @@ def get_allsess_stim(base_data_path,monkey,stim_list):
 
 def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
-    folder = os_sorted(Path.Path(base_data_path, monkey).glob('*' +date + '*'))[0]
 
-    data_path = get_recording_path(base_data_path, monkey, date,depth = 4)
-    data_path = data_path
+    data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
+
     str_vec = Path.Path(data_path).name.split('_')
     hemisphere = str_vec[2]
     hole_id = int(str_vec[3].split('H')[1])
