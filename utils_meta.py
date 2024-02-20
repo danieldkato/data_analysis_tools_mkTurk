@@ -148,6 +148,7 @@ def update_meta_behavior(base_data_path,monkey,df_behavior):
         behav_file_list= os_sorted(Path.Path(folder).glob('*.json'))
         if len(behav_file_list) == 0:
             print('no behavior file in this folder')
+        else:
             for b_f in behav_file_list:
                 m = json.load(open(b_f,'rb'))
                 if m['TASK']['RewardStage'] == 1:

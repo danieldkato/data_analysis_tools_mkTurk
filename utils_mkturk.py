@@ -300,7 +300,11 @@ def gen_scene_df(scenefile):
                 bkg_df.loc[bkg_id]['type'] = 'background'
             if n_s <len(bkg_new):
                 if bkg_new[n_s] != -1:
-                    bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = 1
+                    try: 
+                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = scenefile['IMAGES']['visible'][n_s]
+                    except:
+                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = scenefile['IMAGES']['visible'][0]
+
                     bkg_df.loc['bkg' + str(bkg_new[n_s])]['meta'] = scenefile['IMAGES']['imagebag']
                     try:
                         bkg_df.loc['bkg' + str(bkg_new[n_s])]['size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
@@ -309,7 +313,11 @@ def gen_scene_df(scenefile):
 
         if len(all_bkg_ids) == 1: # background applies to all scenes 
             if bkg_new[0] != -1:
-                bkg_df.loc['bkg' + str(bkg_new[0])]['visibility'] = 1
+                try: 
+                    bkg_df.loc['bkg' + str(bkg_new[0])]['visibility'] = scenefile['IMAGES']['visible'][n_s]
+                except:
+                     bkg_df.loc['bkg' + str(bkg_new[0])]['visibility'] = scenefile['IMAGES']['visible'][0]
+                     
                 bkg_df.loc['bkg' + str(bkg_new[0])]['meta'] = scenefile['IMAGES']['imagebag']
                 try:
                     bkg_df.loc['bkg' + str(bkg_new[0])]['size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
