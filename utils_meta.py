@@ -267,3 +267,27 @@ def find_channels(directory, prefix=None):
     chans = np.unique(indices)
     
     return chans
+
+def get_all_metadata_sess(preprocessed_data_path):
+    
+    files = os.listdir(preprocessed_data_path)
+
+    # Get session metadata:
+    sess_meta_path = os.path.join(preprocessed_data_path, 'stim_info_sess') # < Hack; assuming this always exists
+    sess_meta = pickle.load(open(sess_meta_path, 'rb'))
+        
+    # Get stim metadata:
+    psth_stim_meta_regex = 'ch\d{3}_psth_stim_meta'
+    psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in files if re.search(psth_stim_meta_regex,x) is not None]
+    stim_meta_file = psth_stim_meta_matches[0] # < Assume metadata is the same for all channels
+    stim_meta_path = os.path.join(preprocessed_data_path, stim_meta_file) # < Hack; assuming this always exists
+    stim_meta = pickle.load(open(stim_meta_path, 'rb'))
+
+    # Get scenefile metadata:
+    psth_scenefile_meta_regex = 'ch\d{3}_psth_scenefile_meta'
+    psth_scenefile_meta_matches = [re.search(psth_scenefile_meta_regex,x).group() for x in files if re.search(psth_scenefile_meta_regex,x) is not None]
+    scenefile_meta_file = psth_scenefile_meta_matches[0] # < Assume metadata is the same for all channels
+    scenefile_meta_path = os.path.join(preprocessed_data_path, scenefile_meta_file) # < Hack; assuming this always exists
+    scenefile_meta = pickle.load(open(scenefile_meta_path, 'rb'))
+    
+    return sess_meta, scenefile_meta, stim_meta
