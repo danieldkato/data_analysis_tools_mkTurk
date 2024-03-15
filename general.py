@@ -13,9 +13,9 @@ import pandas as pd
 from natsort import os_sorted
 from operator import itemgetter
 import matplotlib.pyplot as plt
-from mkanalysis.mkutils.meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
-from mkanalysis.mkutils.utils_mkturk import expand_sess_scenefile2stim
-from mkanalysis.mkutils.npix import get_site_coords, partition_adjacent_channels
+from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
+from data_analysis_tools_mkTurk.utils_mkturk import expand_sess_scenefile2stim
+from data_analysis_tools_mkTurk.npix import get_site_coords, partition_adjacent_channels
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
