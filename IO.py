@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from itertools import product
-from mkanalysis.mkutils.meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
+from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
 from data_analysis_tools_mkTurk.stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
 from data_analysis_tools_mkTurk.npix import get_site_coords
 from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df
