@@ -5,7 +5,7 @@ import re
 import numpy as np
 import pandas as pd
 from numpy.matlib import repmat
-from mkanalysis.mkutils.meta import *
+from data_analysis_tools_mkTurk.utils_meta import *
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
     refID=0, ap_gain=500, lf_gain=250, ap_highpass=True, output_directory=None):
