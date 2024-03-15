@@ -228,3 +228,42 @@ def expand_sess_scenefile2stim(scenefile_meta, scenefiles):
     stim_ids = np.unique(stim_ids)
     
     return stim_ids
+
+def find_channels(directory, prefix=None):
+    """
+    Find channels for which input directory contains preprocessed data. Assumes 
+    that input directory includes files containing preprocessed data from one 
+    channel each (e.g. pickle files containing PSTHs). Note however that there
+    may be multiple files containing different data from a single channel. 
+
+    Parameters
+    ----------
+    directory : str
+        Path to directory to search.
+        
+    prefix : str, optional
+        Use to restrict search to files containing certain strings immediately 
+        following channel number. E.g., if prefix='psth', then will only search
+        files whose names begin 'ch<nnn>_psth'. The default is None.
+
+    Returns
+    -------
+    chans : numpy.ndarray
+        Array of channels in current directory.
+
+    """
+    if prefix is None:
+        prefix = ''
+    
+    # Define regex:
+    regex = 'ch\d{3}' + prefix
+    
+    # List directory contents:
+    filenames = os.listdir(directory)
+    
+    # Find patterns matching regex:
+    prefixes = [re.search(regex,x).group() for x in filenames if re.search(regex,x) is not None]
+    indices = [int(x[2:5]) for x in prefixes] # convert channel numbers to int
+    chans = np.unique(indices)
+    
+    return chans
