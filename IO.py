@@ -656,3 +656,35 @@ def h5_2_psths_by_class(h5, classes):
 
 
 
+def standardize_col_types(df):
+    # Find any dataframe columns of more than one type (which causes an error
+    # when saving with pd.to_hdf) then take appropriate steps to make all of one
+    # type
+    
+    # Find columns with more than one datatype:
+    cols = df.cols
+    f = lambda y : len(np.unique([str(type(x)) for x in y])) # Define function for counting how many datatypes there are in a column
+    typenums = np.array([f(df[c]) for c in cols])
+    multitype_col_inds = np.where(typenums > 1)
+    multitype_cols = cols[multitype_col_inds]
+    
+    # Iterate over columns with multiple types:
+    for col in multitype_cols:
+        
+        # Get types in current column:
+        curr_types = np.unique([str(type(x)) for x in df[col]])
+    
+        # Define specific fixes for different combinations of types; this part a bit hack-y:
+        if "<class 'float'>" in curr_types and "<class 'str'>" in curr_types:
+            
+            # If all floats are NaN, make everything string:
+            floats = np.where([type(x)==float for x in df[col]])[0]
+            nans = df[col].isna()[0]
+            if np.all(floats==nans):
+                df[col]= df[col].astype(str)
+    
+            # Otherwise, convert everything to float:
+            else: 
+                df[col] = df[col].astype(float)
+                
+    return df
