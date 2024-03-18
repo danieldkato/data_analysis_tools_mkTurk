@@ -243,7 +243,7 @@ def get_all_metadata_sess(preprocessed_data_path):
     sess_meta = pickle.load(open(sess_meta_path, 'rb'))
         
     # Get stim metadata:
-    psth_stim_meta_regex = 'ch\d{3}_psth_stim_meta'
+    psth_stim_meta_regex = 'psth_stim_meta'
     psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in files if re.search(psth_stim_meta_regex,x) is not None]
     stim_meta_file = psth_stim_meta_matches[0] # < Assume metadata is the same for all channels
     stim_meta_path = os.path.join(preprocessed_data_path, stim_meta_file) # < Hack; assuming this always exists
