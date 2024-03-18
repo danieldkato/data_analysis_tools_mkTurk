@@ -250,7 +250,7 @@ def get_all_metadata_sess(preprocessed_data_path):
     stim_meta = pickle.load(open(stim_meta_path, 'rb'))
 
     # Get scenefile metadata:
-    psth_scenefile_meta_regex = 'ch\d{3}_psth_scenefile_meta'
+    psth_scenefile_meta_regex = 'psth_scenefile_meta'
     psth_scenefile_meta_matches = [re.search(psth_scenefile_meta_regex,x).group() for x in files if re.search(psth_scenefile_meta_regex,x) is not None]
     scenefile_meta_file = psth_scenefile_meta_matches[0] # < Assume metadata is the same for all channels
     scenefile_meta_path = os.path.join(preprocessed_data_path, scenefile_meta_file) # < Hack; assuming this always exists
