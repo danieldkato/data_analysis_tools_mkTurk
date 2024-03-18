@@ -242,6 +242,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             
             # Write full dataframe of trial parameters:
             trial_params_df_out = trial_params_df.copy()
+            trial_params_df_out = standardize_col_types(trial_params_df_out)
             trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
             
             #"""
