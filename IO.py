@@ -663,7 +663,7 @@ def standardize_col_types(df):
     # type
     
     # Find columns with more than one datatype:
-    cols = df.cols
+    cols = df.columns
     f = lambda y : len(np.unique([str(type(x)) for x in y])) # Define function for counting how many datatypes there are in a column
     typenums = np.array([f(df[c]) for c in cols])
     multitype_col_inds = np.where(typenums > 1)
@@ -671,6 +671,8 @@ def standardize_col_types(df):
     
     # Iterate over columns with multiple types:
     for col in multitype_cols:
+        
+        print(col)
         
         # Get types in current column:
         curr_types = np.unique([str(type(x)) for x in df[col]])
@@ -680,12 +682,13 @@ def standardize_col_types(df):
             
             # If all floats are NaN, make everything string:
             floats = np.where([type(x)==float for x in df[col]])[0]
-            nans = df[col].isna()[0]
-            if np.all(floats==nans):
+            nans = np.where(df[col].isna())[0]
+            if len(floats)==len(nans) and np.all(floats==nans):
                 df[col]= df[col].astype(str)
     
             # Otherwise, convert everything to float:
             else: 
+                df.loc[df[col]=='', col] = np.nan # Convert any empty strings to nan
                 df[col] = df[col].astype(float)
                 
     return df
