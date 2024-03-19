@@ -99,7 +99,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         preprocessed_data_path = get_recording_path(base_data_path, monkey, date, depth=4)[0]
     
     # Load metadata for current session:
-    recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split('\\')[-1]
+    recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split(os.sep)[-1]
     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
     sess_meta_df = sess_meta_dict_2_df(sess_meta)
     stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
