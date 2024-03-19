@@ -497,9 +497,9 @@ def data_dicts_2_df(dict_list):
         curr_att_vals = np.array([x['stim_info'][attr] for x in dict_list])
         
         # Make all values of current attribute of same type (needed to save to HDF5 later):
-        if np.any([type(x)==str for x in curr_att_vals]):
+        if np.any([type(x)==str for x in curr_att_vals.reshape(-1)]):
             curr_type = str
-        elif np.any([isinstance(x, numbers.Number) for x in curr_att_vals]):
+        elif np.any([isinstance(x, numbers.Number) for x in curr_att_vals.reshape(-1)]):
             curr_type = np.float32
         
         df.iloc[0:len(dict_list), col_offset:col_offset+n_els] = curr_att_vals
