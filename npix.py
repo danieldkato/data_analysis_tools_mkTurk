@@ -290,7 +290,7 @@ def get_session_chs(date, region=None):
     if session_dict is not None:
         
         channels = []
-        areas = list(session_dict.keys())
+        regions = list(session_dict.keys())
         
         if region is None:
             for region in regions:
