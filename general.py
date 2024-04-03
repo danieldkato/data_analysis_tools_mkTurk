@@ -1177,4 +1177,20 @@ def split_grouped_inds(grouped_inds, n_splits=2):
             splits[j].append(split)
         
     return splits
+
+
+
+def round_ud(x, decimals=2, direction='up'):
+
+    if direction == 'up':
+        func = np.ceil
+    elif direction == 'down':
+        func = np.floor
+    else:
+        raise ValueError('Invalid rounding direction; please specify ''up'' or ''down''.')
     
+    y = x*(10**decimals) 
+    z = func(y)
+    xhat = z/(10**decimals)
+
+    return xhat    
