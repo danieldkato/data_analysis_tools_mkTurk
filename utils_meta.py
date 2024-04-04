@@ -257,3 +257,17 @@ def get_all_metadata_sess(preprocessed_data_path):
     scenefile_meta = pickle.load(open(scenefile_meta_path, 'rb'))
     
     return sess_meta, scenefile_meta, stim_meta
+
+
+
+def scenefile2rsvp_inds(data_dicts, scenefile):
+    
+    data_dicts_sfile = [data_dicts[x] for x in np.arange(len(data_dicts)) if data_dicts[x]['scenefile']==scenefile]
+    trial_nums = [x['trial_num'] for x in data_dicts_sfile]                                                         
+    rsvp_nums = [x['rsvp_num'] for x in data_dicts_sfile]                                                         
+    
+    A = np.array([trial_nums, rsvp_nums]).T
+    
+    return A
+
+    
