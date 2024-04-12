@@ -495,20 +495,19 @@ def data_dicts_2_df(dict_list):
         
         col_offset = i*n_els
         curr_att_vals = np.array([x['stim_info'][attr] for x in dict_list])
-        
-        # Make all values of current attribute of same type (needed to save to HDF5 later):
-        if np.any([type(x)==str for x in curr_att_vals.reshape(-1)]):
-            curr_type = str
-        elif np.any([isinstance(x, numbers.Number) for x in curr_att_vals.reshape(-1)]):
-            curr_type = np.float32
-        
         df.iloc[0:len(dict_list), col_offset:col_offset+n_els] = curr_att_vals
         
         # Convert columns to appropriate type:
         curr_cols = df.columns[col_offset:col_offset+n_els]
         for col in curr_cols:
+            
+            # Make all values of current column of same type (needed to save to HDF5 later):
+            if np.any([type(x)==str for x in df[col]]):
+                curr_type = str
+            elif np.any([isinstance(x, numbers.Number) for x in df[col]]):
+                curr_type = np.float32
+                
             df[col] = df[col].apply(curr_type)
-        #print('pause')
 
     # Eliminate all-nan columns:
     is_nan_col = [np.all([str(x)=='nan' for x  in df[y].to_numpy()]) for y in df.columns]
