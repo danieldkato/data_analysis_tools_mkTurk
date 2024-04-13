@@ -443,7 +443,7 @@ def stim_groups_2_rsvp_inds(trial_df, groups):
     
     grouped_inds = []
     for group in groups:
-        inds = stim_ids_2_rsvp_inds(trial_df, group)
+        inds = np.array(trial_df[trial_df.stim_id.isin(group)][['trial_num', 'rsvp_num']])
         grouped_inds.append(inds)
     
     return grouped_inds
