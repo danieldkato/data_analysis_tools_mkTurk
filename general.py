@@ -460,10 +460,15 @@ def rsvp_from_df(df, stim_inds):
     inds_df['trial_num'] = stim_inds[:, 0]
     inds_df['rsvp_num'] = stim_inds[:, 1]
     
-    compare_cols = ['trial_num', 'rsvp_num']
-    mask = pd.Series(list(zip(*[df[c] for c in compare_cols]))).isin(list(zip(*[inds_df[c] for c in compare_cols])))
+    #compare_cols = ['trial_num', 'rsvp_num']
+    #mask = pd.Series(list(zip(*[df[c] for c in compare_cols]))).isin(list(zip(*[inds_df[c] for c in compare_cols])))
     
-    df_out = df.loc[mask.values]
+    g = lambda r, s : r['trial_num']==df.loc[s,'trial_num'] and r['rsvp_num']==df.loc[s,'rsvp_num']
+    f = lambda r : [s for s in df.index if g(r,s)][0]
+    
+    matches = inds_df.apply(f, axis=1)
+    
+    df_out = df.loc[matches.values]
     
     return df_out
 
