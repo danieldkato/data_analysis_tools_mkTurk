@@ -505,6 +505,37 @@ def df_2_psth_mat(df):
 
 
 
+def df_2_rsvp_mat(df):
+
+    # Get data dimensions:
+    min_trial = min(df.trial_num)
+    max_trial = max(df.trial_num)
+    n_trials = max_trial - min_trial
+
+    max_rsvp = max(df.rsvp_num)    
+    n_rsvp = max_rsvp + 1
+
+    shapes = np.array([x.shape for x in df.psth])
+    n_chan = max(shapes[:,0])
+    n_timebins = max(shapes[:,1])
+    
+    # Initialize output array:
+    A = np.empty((n_chan, n_timebins, n_trials, n_rsvp))    
+    A[:] = np.nan
+
+    # Populate output array: 
+    for r in np.arange(n_rsvp):
+        
+        curr_rsvp_rows = df[df.rsvp_num==r] 
+        curr_rsvp_data = np.array(list(curr_rsvp_rows.psth)) # Repeats-by-channels-by-timebins
+        curr_rsvp_data = np.transpose(curr_rsvp_data, axes=[1,2,0]) # Convert to channels-by-timebins-by-repeats
+        curr_rsvp_trial_nums = curr_rsvp_rows.trial_num
+        A[:,:,curr_rsvp_trial_nums-min_trial,r] = curr_rsvp_data
+        
+    return A
+
+
+
 def select_channels(df, channels):
     """
     Extract spike counts for a single channel from a dataframe of trialized PSTH 
