@@ -460,11 +460,11 @@ def rsvp_from_df(df, stim_inds):
     inds_df['trial_num'] = stim_inds[:, 0]
     inds_df['rsvp_num'] = stim_inds[:, 1]
     
+    # Find which rows of df correspond to requested (trial_num, rsvp_num) pairs:
     #compare_cols = ['trial_num', 'rsvp_num']
     #mask = pd.Series(list(zip(*[df[c] for c in compare_cols]))).isin(list(zip(*[inds_df[c] for c in compare_cols])))
     
-    g = lambda r, s : r['trial_num']==df.loc[s,'trial_num'] and r['rsvp_num']==df.loc[s,'rsvp_num']
-    f = lambda r : [s for s in df.index if g(r,s)][0]
+    f = lambda r : df[np.array(df.trial_num==r.trial_num) & np.array(df.rsvp_num==r.rsvp_num)].index[0]
     
     matches = inds_df.apply(f, axis=1)
     
