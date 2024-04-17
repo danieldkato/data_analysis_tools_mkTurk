@@ -510,7 +510,7 @@ def df_2_rsvp_mat(df):
     # Get data dimensions:
     min_trial = min(df.trial_num)
     max_trial = max(df.trial_num)
-    n_trials = max_trial - min_trial
+    n_trials = max_trial - min_trial + 1
 
     max_rsvp = max(df.rsvp_num)    
     n_rsvp = max_rsvp + 1
