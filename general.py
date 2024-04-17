@@ -507,6 +507,9 @@ def df_2_psth_mat(df):
 
 def df_2_rsvp_mat(df):
 
+    # Sort dataframe by trial then rsvp num:
+    df = df.sort_values(by=['trial_num', 'rsvp_num'])
+
     # Get data dimensions:
     min_trial = min(df.trial_num)
     max_trial = max(df.trial_num)
