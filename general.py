@@ -935,15 +935,15 @@ def zscore_df(df, baseline_window, psth_bins, reference='baseline'):
 
     Returns
     -------
-    df : pandas.core.frame.DataFrame
+    dfz : pandas.core.frame.DataFrame
         Same as input, except data in 'psth' column are Z-scores rather than
         raw spike counts.
 
     """
     
     # Zero-center baseline period for each trial:
-    df = bl_subtract_data(df, baseline_window, psth_bins)
-    data = df_2_psth_mat(df) # < channels-by-timebins-by-repeats
+    dfz = bl_subtract_data(deepcopy(df), baseline_window, psth_bins)
+    data = df_2_psth_mat(dfz) # < channels-by-timebins-by-repeats
     n_channels = data.shape[0]
     n_bins = data.shape[1]
     n_repeats = data.shape[2]
@@ -966,9 +966,9 @@ def zscore_df(df, baseline_window, psth_bins, reference='baseline'):
     
     # Deal z-scored data back to dataframe:
     Z = np.transpose(Z, axes=[2, 0, 1])
-    df.psth = list(Z)
+    dfz.psth = list(Z)
     
-    return df
+    return dfz
 
 
 
