@@ -339,6 +339,30 @@ def time_window2bin_indices(plot_window, psth_bins):
 
 
 
+def time_2_bin_index(t, psth_bins, round_dir='down'):
+    
+    # Raise warnings, return None if matching PSTH bins not found:
+    within_psth_start = t >= min(psth_bins)
+    within_psth_stop = t <= max(psth_bins)
+    valid = within_psth_start and within_psth_stop
+    if not valid:
+        if not within_psth_start:
+            warnings.warn('Requested time before PSTH start, returning None.')
+        elif not within_psth_stop:
+            warnings.warn('Requested time after PSTH, returning None.')
+        return None
+    
+    if round_dir == 'up':
+        geq = np.argwhere(psth_bins >= t)
+        idx = np.min(geq)
+    elif round_dir == 'down':
+        leq = np.argwhere(psth_bins <= t)
+        idx = np.max(leq)
+        
+    return idx
+
+
+
 def bin_channels(trial_df, bin_size=4, sites_df=None):
     """
     Average spike count data across bins of adjacent channels.
