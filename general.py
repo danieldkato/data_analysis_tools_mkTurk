@@ -490,6 +490,7 @@ def rsvp_from_df(df, stim_inds):
     
     f = lambda r : df[np.array(df.trial_num==r.trial_num) & np.array(df.rsvp_num==r.rsvp_num)].index[0]
     
+    print('inds_df.shape = {}'.format(inds_df.shape))
     matches = inds_df.apply(f, axis=1)
     
     df_out = df.loc[matches.values]
@@ -1132,6 +1133,42 @@ def find_signed_angle(ref, tgt, axis=1):
         signed_angle = -1*np.degrees(angle_abs)
 
     return signed_angle 
+
+
+
+def stitch_rsvps(trial):
+
+    # Initialize stuff:    
+    n_rsvp_slots = trial.shape[0] 
+    PSTH = []
+    Bins = []
+    
+    # Get data, bins for 0-th RSVP slot (including prestim baseline):
+    r0_start_time = trial.iloc[0].psth_bins[0]
+    r0_stop_time = trial.iloc[0].dur/1000
+    [r0_start_idx, r0_stop_idx ] = time_window2bin_indices([r0_start_time, r0_stop_time], trial.iloc[0].psth_bins)
+    r0_dat = trial.iloc[0].psth[:, r0_start_idx:r0_stop_idx+1]
+    r0_psth_bins = deepcopy(trial.iloc[0].psth_bins[r0_start_idx:r0_stop_idx+1])    
+    PSTH.append(r0_dat)
+    Bins.append(r0_psth_bins)
+    
+    for i in np.arange(n_rsvp_slots)[1:]:
+        
+        curr_start_time = 0 # < ASSUMING NO ITI! Might eventually want to relax assumption
+        curr_stop_time = trial.iloc[i].dur/1000 # < Stop time is just stim duration
+        curr_psth_bins_all = deepcopy(trial.iloc[i].psth_bins)
+        [start_idx, stop_idx] = time_window2bin_indices([curr_start_time, curr_stop_time], curr_psth_bins_all)
+        curr_dat = trial.iloc[i].psth[:, start_idx:stop_idx+1]
+        curr_psth_bins_truncated = deepcopy(trial.iloc[i].psth_bins[start_idx:stop_idx+1]) 
+        curr_psth_bins_truncated_offset = curr_psth_bins_truncated +  np.cumsum(trial.iloc[0:i].dur/1000).values[-1]
+    
+        PSTH.append(curr_dat)        
+        Bins.append(curr_psth_bins_truncated_offset)
+    
+    PSTH = np.concatenate(PSTH, axis=1)
+    Bins = np.concatenate(Bins)
+    
+    return PSTH, Bins
 
 
 
