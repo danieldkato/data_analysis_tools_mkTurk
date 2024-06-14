@@ -1159,8 +1159,13 @@ def stitch_rsvps(trial):
         curr_psth_bins_all = deepcopy(trial.iloc[i].psth_bins)
         [start_idx, stop_idx] = time_window2bin_indices([curr_start_time, curr_stop_time], curr_psth_bins_all)
         curr_dat = trial.iloc[i].psth[:, start_idx:stop_idx+1]
-        curr_psth_bins_truncated = deepcopy(trial.iloc[i].psth_bins[start_idx:stop_idx+2]) # +2 instead of +1 because these are supposed to be bin edges, i.e. including both the lower bound of the first bin and the upper bound of the last bin; so bin array should be one element longer than number of bins in PSTH array 
+        if i == np.arange(n_rsvp_slots)[-1]:
+            offset = 2 # want last bin to be bracketed by trailing bin edge; these are supposed to be bin edges, i.e. including both the lower bound of the first bin and the upper bound of the last bin; so bin array should be one element longer than number of bins in PSTH array
+        else:
+            offset = 1
+        curr_psth_bins_truncated = deepcopy(trial.iloc[i].psth_bins[start_idx:stop_idx+offset]) 
         curr_psth_bins_truncated_offset = curr_psth_bins_truncated +  np.cumsum(trial.iloc[0:i].dur/1000).values[-1]
+        curr_psth_bins_truncated_offset = np.round(curr_psth_bins_truncated_offset, decimals=4) # deal with some rounding errors
     
         PSTH.append(curr_dat)        
         Bins.append(curr_psth_bins_truncated_offset)

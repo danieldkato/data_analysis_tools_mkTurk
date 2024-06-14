@@ -111,8 +111,19 @@ def get_coords_sess(base_data_path, monkey, date):
     dv_coord = float(str_vec[6].split('DV')[1])
     ml_coord = float(str_vec[7].split('ML')[1])
     ang = float(str_vec[8].split('Ang')[1])
-    depth_start = int(str_vec[9].split('Dep')[1].split('-')[0])
-    depth_end = str_vec[9].split('Dep')[1].split('-')[1]
+    
+    # Position of depth within str_vec is variable due to changes in naming 
+    # convention over time; automatically find Depth tag using reegex; maybe
+    # should eventually do this for all other variables too?
+    depth_inds = np.where([re.search('Dep',x) is not None for x in str_vec])[0]
+    if len(depth_inds) == 1:
+        depth_ind = depth_inds[0]
+    elif len(depth_inds) < 1:
+        raise ValueError('No depth specified in data path.')
+    elif len(depth_inds) > 1:
+        raise ValueError('More than one depth specified in data path.')
+    depth_start = int(str_vec[depth_ind].split('Dep')[1].split('-')[0])
+    depth_end = str_vec[depth_ind].split('Dep')[1].split('-')[1]
 
     return ap_coord, dv_coord, ml_coord, ang, depth_start
 
