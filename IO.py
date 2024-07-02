@@ -740,7 +740,7 @@ def find_saved_imgs_dir(data_dicts):
         return None
         
     saved_imgs_dirname = 'Saved_Images_{}_neural_stim_{}_{}'.format(monkey, stim_set, exp_id)
-    saved_imgs_base_dir = os.path.join(base_dir, saved_imgs_dirname)     
+    saved_imgs_base_dir = os.path.join(base_dir, monkey, 'Saved_Images', saved_imgs_dirname)     
     
     return saved_imgs_base_dir
         
