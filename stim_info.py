@@ -519,8 +519,9 @@ def data_dicts_2_df(dict_list):
     trial_num = np.array([x['trial_num'] for x in dict_list])
     rsvp_num = np.array([x['rsvp_num'] for x in dict_list])
     scenefile = np.array([x['scenefile'] for x in dict_list])
+    stim_idx = np.array([x['stim_id'] for x in dict_list])
     stim_info_short = np.array([x['stim_info_short'] for x in dict_list])
-    df_basic = pd.DataFrame({'trial_num':trial_num, 'rsvp_num':rsvp_num, 'scenefile':scenefile, 'stim_id':stim_info_short})
+    df_basic = pd.DataFrame({'trial_num':trial_num, 'rsvp_num':rsvp_num, 'scenefile':scenefile, 'stim_idx':stim_idx, 'stim_id':stim_info_short})
     
     df_out = pd.concat([df_basic, df], axis=1)
     
