@@ -716,7 +716,7 @@ def find_saved_imgs_dir(data_dicts):
     
     # Try to get stim set number:
     stim_set_regex = 'neural_stim_\d+_'
-    h = lambda x : re.earch(stim_set_regex, x)
+    h = lambda x : re.search(stim_set_regex, x)
     stim_sets = [h(x).group()[-2] for x in sfiles if h(x) is not None]
         
     # Verify that all scenefiles of the same stim set:
