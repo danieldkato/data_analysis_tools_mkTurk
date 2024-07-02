@@ -5,6 +5,7 @@ import pathlib as Path
 import h5py
 import pickle
 import warnings
+import regex as re
 import numpy as np
 import pandas as pd
 from itertools import product
@@ -692,3 +693,24 @@ def standardize_col_types(df):
                 df[col] = df[col].astype(float)
                 
     return df
+
+
+
+def find_exp_id(data_dicts):
+    
+    # Get all unique scenefiles in current experiment:
+    sfiles = np.unqiue([x['scenefile'] for x in data_dicts])
+    
+    # Try to get experiment ID from scenefile ending 'ABCDEFGHIJUVWXYZ_<ID>.json'
+    regex = '[A-Z]{5,}_\d{2,2}.json'
+    f = lambda x : re.search(regex, x)
+    exp_ids = [f(x).group()[-7:-5] for x in sfiles if f(x) is not None]
+    
+    # Verify that all exp_ids are the same; if not, return None
+    if np.all([x==exp_ids[0] for x in exp_ids]):
+        exp_id = exp_ids[0]
+    else: 
+        exp_id = None
+        
+    return exp_id
+        
