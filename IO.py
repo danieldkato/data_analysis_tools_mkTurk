@@ -5,7 +5,7 @@ import pathlib as Path
 import h5py
 import pickle
 import warnings
-import regex as re
+import re
 import numpy as np
 import pandas as pd
 from itertools import product
