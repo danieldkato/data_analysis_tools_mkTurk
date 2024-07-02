@@ -696,21 +696,51 @@ def standardize_col_types(df):
 
 
 
-def find_exp_id(data_dicts):
+def find_saved_imgs_dir(data_dicts):
+    
+    base_dir = os.path.join('mnt', 'smb', 'locker', 'issa-locker', 'Data')
     
     # Get all unique scenefiles in current experiment:
     sfiles = np.unqiue([x['scenefile'] for x in data_dicts])
     
+    # Get monkey names:
+    mnames = [x.split('/')[3] for x in np.unique(sfiles)]
+    
+    # Verify that all scenefiles refer to the same monkey:
+    if np.all([x==mnames[0] for x in mnames]):
+        monkey = mnames[0]
+    # If more than one monkey detected, raise warning and return None
+    else:
+        warnings.warn('More than one monkey name discovered among scenefile paths.')
+        return None
+    
+    # Try to get stim set number:
+    stim_set_regex = 'neural_stim_\d+_'
+    h = lambda x : re.earch(stim_set_regex, x)
+    stim_sets = [h(x).group()[-2] for x in sfiles if h(x) is not None]
+        
+    # Verify that all scenefiles of the same stim set:
+    if np.all([x==stim_sets[0] for x in stim_sets]): 
+        stim_set = stim_sets[0]
+    # Otherwise, raise warning and return None:
+    else:
+        warnings.warn('More than one monkey name discovered among scenefile paths.')
+        return None
+        
     # Try to get experiment ID from scenefile ending 'ABCDEFGHIJUVWXYZ_<ID>.json'
-    regex = '[A-Z]{5,}_\d{2,2}.json'
-    f = lambda x : re.search(regex, x)
+    exp_regex = '[A-Z]{5,}_\d{2,2}.json'
+    f = lambda x : re.search(exp_regex, x)
     exp_ids = [f(x).group()[-7:-5] for x in sfiles if f(x) is not None]
     
-    # Verify that all exp_ids are the same; if not, return None
+    # Verify that all exp_ids are the same; if not, raise warning and return None
     if np.all([x==exp_ids[0] for x in exp_ids]):
         exp_id = exp_ids[0]
     else: 
-        exp_id = None
+        warnings.warn('More than one experiment ID discovered among scenefile paths.')
+        return None
         
-    return exp_id
+    saved_imgs_dirname = 'Saved_Imasges_{}_neural_stim_{}_{}'.format(monkey, stim_set, exp_id)
+    saved_imgs_base_dir = os.path.join(base_dir, saved_imgs_dirname)     
+    
+    return saved_imgs_base_dir
         
