@@ -701,7 +701,7 @@ def find_saved_imgs_dir(data_dicts):
     base_dir = os.path.join('mnt', 'smb', 'locker', 'issa-locker', 'Data')
     
     # Get all unique scenefiles in current experiment:
-    sfiles = np.unqiue([x['scenefile'] for x in data_dicts])
+    sfiles = np.unique([x['scenefile'] for x in data_dicts])
     
     # Get monkey names:
     mnames = [x.split('/')[3] for x in np.unique(sfiles)]
