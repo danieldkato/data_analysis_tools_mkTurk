@@ -793,9 +793,12 @@ def find_saved_imgs_dir(trial_params):
     exp_ids = [f(x).group()[-7:-5] for x in sfiles if f(x) is not None]
     
     # Verify that all exp_ids are the same; if not, raise warning and return None
-    if np.all([x==exp_ids[0] for x in exp_ids]):
+    if len(np.unique(exp_ids)) == 1:
         exp_id = exp_ids[0]
-    else: 
+    elif len(np.unique(exp_ids)) < 1: 
+        warnings.warn('No experiment ID discovered among scenefile paths.')
+        return None
+    elif len(np.unique(exp_ids)) > 1: 
         warnings.warn('More than one experiment ID discovered among scenefile paths.')
         return None
         
