@@ -757,7 +757,7 @@ def find_im_full_paths(trial_params_df, base_data_path):
         # off by some offset; correct here:
         sfile_imdirs = np.unique(trial_params_df.sfile_imdir)
         for s in sfile_imdirs:
-            curr_rows = trial_params_df.imdir == s
+            curr_rows = trial_params_df.sfile_imdir == s
             trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
         
         # Create dataframe of unique images:
