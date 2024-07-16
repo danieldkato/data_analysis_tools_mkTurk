@@ -251,7 +251,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             
             #"""
             # Write truncated dataframe of select trial parameters:
-            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'scenefile']
+            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile']
             trial_params_short = trial_params_df[short_cols] 
             trial_params_short = trial_params_short.rename(columns={'stim_info_short' : 'stim_id'})
             trial_params_short.to_hdf(output_path, 'trial_params_short', 'a', format='fixed')
