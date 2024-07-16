@@ -699,7 +699,7 @@ def standardize_col_types(df):
 
 
 
-def find_im_full_paths(trial_params_df, base_data_path):
+def find_im_full_paths(trial_params_df, local_data_path=None):
     
     # Try to find base image directory:
     base_imdir = find_saved_imgs_dir(trial_params_df)
@@ -712,7 +712,10 @@ def find_im_full_paths(trial_params_df, base_data_path):
     else:
         
         # base_imdir is relative to axon root; convert to relative to local machine: 
-        base_imdir_local = os.path.join(base_data_path+'\\', os.sep.join(base_imdir.split('\\')[5:])) 
+        if local_data_path is not None:
+            base_imdir_local = os.path.join(local_data_path+'\\', os.sep.join(base_imdir.split('\\')[5:])) 
+        else:
+            base_imdir_local = base_imdir
         
         # Get paths to scenefile-specific image directories relative to local machine: 
         j = lambda x : os.path.join(base_imdir_local, x.scenefile.split('/')[-1][:-5])
