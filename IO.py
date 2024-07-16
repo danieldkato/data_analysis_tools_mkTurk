@@ -733,13 +733,16 @@ def standardize_col_types(df):
 
 
 
-def find_saved_imgs_dir(data_dicts):
+def find_saved_imgs_dir(trial_params):
     
     base_dir = os.path.join('mnt', 'smb', 'locker', 'issa-locker', 'Data')
     
     # Get all unique scenefiles in current experiment:
-    sfiles = np.unique([x['scenefile'] for x in data_dicts])
-    
+    if type(trial_params) == list:
+        sfiles = np.unique([x['scenefile'] for x in trial_params])
+    elif type(trial_params) == pd.core.frame.DataFrame:
+        sfiles = np.unique(trial_params['scenefile'])
+        
     # Get monkey names:
     mnames = [x.split('/')[3] for x in np.unique(sfiles)]
     
