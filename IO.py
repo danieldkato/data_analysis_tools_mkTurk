@@ -764,7 +764,7 @@ def find_saved_imgs_dir(trial_params):
         stim_set = stim_sets[0]
     # Otherwise, raise warning and return None:
     else:
-        warnings.warn('More than one monkey name discovered among scenefile paths.')
+        warnings.warn('More than one stim set discovered among scenefile paths.')
         return None
         
     # Try to get experiment ID from scenefile ending 'ABCDEFGHIJUVWXYZ_<ID>.json'
