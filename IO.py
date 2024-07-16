@@ -713,7 +713,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         
         # base_imdir is relative to axon root; convert to relative to local machine: 
         if local_data_path is not None:
-            base_imdir_local = os.path.join(local_data_path+'\\', os.sep.join(base_imdir.split('\\')[5:])) 
+            base_imdir_local = os.path.join(local_data_path+os.path.sep, os.sep.join(base_imdir.split(os.path.sep)[5:])) 
         else:
             base_imdir_local = base_imdir
         
@@ -742,8 +742,10 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         find_matching_pngs = lambda x : [y for y in all_pngs if x.sfile_imdir in y and '_index{}.png'.format(x.stim_idx) in y]
         matching_pngs = unique_images.apply(find_matching_pngs, axis=1)
         matching_pngs = [y[0] if len(y)>0 else None for y in matching_pngs] # < Take first matching PNG if it exists, otherwise use None; ASSUMING FIRST MATCHING PNG IS THE SAME AS OTHERS
+        matching_pngs = [os.path.join(os.path.sep.join(base_imdir.split(os.path.sep)[0:4]), os.path.sep.join(x.split(os.path.sep)[1:])) for x in matching_pngs] # Convert local paths back to relative to axon:
+        matching_pngs = ['/' + x.replace(os.path.sep, '/') for x in matching_pngs]
         unique_images['img_full_path'] = matching_pngs
-        
+            
         # Merge unique images with full paths to trial_params_df:
         trial_params_df = pd.merge(trial_params_df, unique_images, on=['sfile_imdir', 'stim_idx'], how='outer')
 
