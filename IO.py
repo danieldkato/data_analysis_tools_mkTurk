@@ -136,6 +136,43 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     extra_params_df = extra_params_df.set_index('idx')
     trial_params_df = pd.concat([extra_params_df, trial_params_df], axis=1)
     
+    # Try to get paths to saved images:
+    base_imdir = find_saved_imgs_dir(D)
+    if base_imdir is not None:
+        
+        # base_imdir is relative to axon root; convert to relative to local machine: 
+        base_imdir_local = os.path.join(base_data_path+'\\', os.sep.join(base_imdir.split('\\')[5:])) 
+        
+        # Get paths to scenefile-specific image directories relative to local machine: 
+        j = lambda x : os.path.join(base_imdir_local, x.scenefile.split('/')[-1][:-5])
+        trial_params_df['sfile_imdir'] = trial_params_df.apply(j,axis=1)
+        
+        # HACK; data_dicts appear to include a mistake where stim indices are 
+        # off by some offset; correct here:
+        sfile_imdirs = np.unique(trial_params_df.sfile_imdir)
+        for s in sfile_imdirs:
+            curr_rows = trial_params_df.imdir == s
+            trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
+        
+        # Create dataframe of unique images:
+        unique_images = trial_params_df[['sfile_imdir', 'stim_idx']].drop_duplicates()
+        unique_images = unique_images.sort_values(by=['sfile_imdir', 'stim_idx'])
+        
+        # Get all PNGs in base_imdir:
+        all_pngs = []
+        for s in sfile_imdirs:
+            pngs = [os.path.join(s,x) for x in os.listdir(s) if re.search('_index\d+.png',x) is not None]
+            all_pngs += pngs
+            
+        # Find saved PNGs matching rows of unique_images:
+        find_matching_pngs = lambda x : [y for y in all_pngs if x.sfile_imdir in y and '_index{}.png'.format(x.stim_idx) in y]
+        matching_pngs = unique_images.apply(find_matching_pngs, axis=1)
+        matching_pngs = [y[0] if len(y)>0 else None for y in matching_pngs] # < Take first matching PNG if it exists, otherwise use None; ASSUMING FIRST MATCHING PNG IS THE SAME AS OTHERS
+        unique_images['img_full_path'] = matching_pngs
+        
+        # Merge unique images with full paths to trial_params_df:
+        trial_params_df = pd.merge(trial_params_df, unique_images, on=['sfile_imdir', 'stim_idx'], how='outer')
+        
     # Copy general timing params to own dict as formal return:
     bin_width = stim_meta[stim_ids[0]]['binwidth'] # < Hack; assuming (probably safely) that same for all stim
     t_before = stim_meta[stim_ids[0]]['t_before'] # < Hack; assuming (probably safely) that same for all stim
