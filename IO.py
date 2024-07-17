@@ -862,7 +862,7 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
         # If stim set is greater than or equal to 5, try to additionally get experiment ID:
         elif stim_set >= 5:
             
-            expt_regex = '_\d+[A-Z]{3,3}\d*_\d{2,2}'
+            expt_regex = '_\d+[A-Z]{3,}\d*_\d{2,2}'
             expt_search = re.search(expt_regex, scenefile_name)
             if expt_search is not None:
                 expt_str = expt_search.group()[-2:]
