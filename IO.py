@@ -808,4 +808,118 @@ def find_saved_imgs_dir(trial_params):
     saved_imgs_base_dir = os.path.join(base_dir, monkey, 'Saved_Images', saved_imgs_dirname)     
     
     return saved_imgs_base_dir
+
+
+
+def scenefile_2_img_dir(scenefile_name, local_base=None):
+    """
+    Find saved image directory for input scenefile.
+
+    Parameters
+    ----------
+    scenefile_name : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    if local_base is None:
+        base = os.path.join('mnt', 'smb', 'locker', 'issa-locker', 'Data')
+    else:
+        base = local_base
+    
+    # Get monkey name:
+    sfile_parts = scenefile_name.split('/')
+    monkey = sfile_parts[3]
+    monkey_dir = os.path.join(base, monkey, 'Saved_Images')
+    monkey_dir_contents = os.listdir(monkey_dir)
+    
+    # Get scenefile basename:
+    sfile_basename = scenefile_name.split('/')[-1][:-5]
+    
+    ####
+    # If dealing with scene stimuli:
+    scene_regex = 'neural_stim_\d+'
+    if re.search(scene_regex, scenefile_name) is not None:
+        
+        # Get stim set number:
+        stim_set_str = re.search(scene_regex, scenefile_name).group()
+        stim_set = int(stim_set_str[12:])
+            
+        # If stim set is less than 5
+        if stim_set < 5:
+
+            expt_dirname = 'Saved_Images_{}_{}'.format(monkey, stim_set_str)
+            # POSSIBLY IMPORTANT? For stim_set = 4, this will automatically 
+            # default to Saved_Images_West_neural_stim_4 rather than 
+            # Saved_Images_West_neural_stim_4_1ABC2DEF_RSVP44; don't know how
+            # differentiate between which of these is appropriate based just on
+            # scenefile name; does it matter?
+            
+        # If stim set is greater than or equal to 5, try to additionally get experiment ID:
+        elif stim_set >= 5:
+            
+            expt_regex = '_\d+[A-Z]{3,3}\d*_\d{2,2}'
+            expt_search = re.search(expt_regex, scenefile_name)
+            if expt_search is not None:
+                expt_str = expt_search.group()[-2:]
+            else:
+                raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+            
+            # Define experiment directory:
+            expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
+            
+        expt_directory = os.path.join(monkey_dir, expt_dirname)
+    
+    
+    ####
+    # Else if dealing with natural image stimuli:
+    elif 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name:
+        
+        # Look for experiment directories containing 'Rust' and 'NaturalImages'
+        matches = [x for x in monkey_dir_contents if 'Rust' in x and 'NaturalImages' in x]
+        if len(matches) == 1:
+            expt_dirname = matches[0]
+            expt_directory = os.path.join(monkey_dir, expt_dirname)
+        elif len(matches) < 1:
+            raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+        elif len(matches) > 1:
+            raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+    
+        # Random exception handling:
+        if monkey == 'West':
+            expt_directory = os.path.join(expt_directory, 'Save_Images_West_RustDiCarlo')
+    
+    
+    ####
+    # Else if dealing with face stimuli:
+    elif 'elias' in scenefile_name or 'neptune' in scenefile_name:
+        
+        face_expt_dirs = [x for x in monkey_dir_contents if 'Elias' in x and 'Neptune' in x]
+        if len(face_expt_dirs) == 1:
+            expt_dirname = face_expt_dirs[0]
+        elif len(face_expt_dirs) < 1:
+            raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+        elif len(face_expt_dirs) > 1:
+            raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+    
+        expt_directory = os.path.join(monkey_dir, expt_dirname)    
+        
+        # Random exception handling:
+        if monkey == 'West':
+            expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
+    
+    # Find directory in expt_directory with same name as scenefile basename:
+    if not os.path.exists(expt_directory):
+        raise AssertionError('Experiment directory for scenefile {} not found in saved image folder.'.format(scenefile_name))
+    expt_dir_contents = os.listdir(expt_directory)
+    if sfile_basename in expt_dir_contents:
+        img_dir = os.path.join(expt_directory, sfile_basename)
+    else:
+        raise AssertionError('Scenefile directory for {} not found in {}'.format(sfile_basename, expt_directory))
+    
+    return img_dir
         
