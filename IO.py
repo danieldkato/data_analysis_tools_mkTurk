@@ -714,50 +714,19 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         curr_rows = trial_params_df.sfile_imdir == s
         trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
     
+    # Create dataframe of unique images, add image directories:
+    unique_images_df = trial_params_df[['scenefile', 'stim_idx']].drop_duplicates()
+    tmp = pd.DataFrame(columns=['scenefile', 'sfile_imdir'])
+    tmp['scenefile'] = sfiles
+    tmp['sfile_imdir'] = sfile_saved_img_dirs
+    unique_images_df = pd.merge(unique_images_df, tmp, on=['scenefile'], how='outer')
     
+    # Get full paths to saved images, add to dataframe:
+    impaths = unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
+    unique_images_df['img_full_path'] = impaths
     
-    
-    
-    # Try to find base image directory:
-    base_imdir = find_saved_imgs_dir(trial_params_df)
-    
-    # If unsuccessful, raise warning and return original dataframe...:
-    if base_imdir is None:
-        warnings.warn('Base image directory not found for input dataframe, will not add full image paths.')
-     
-    # ... otherwise, if base image directory successfully discovered, find paths to PNGs:
-    else:
-        
-        # base_imdir is relative to axon root; convert to relative to local machine: 
-        if local_data_path is not None:
-            base_imdir_local = os.path.join(local_data_path+os.path.sep, os.sep.join(base_imdir.split(os.path.sep)[5:])) 
-        else:
-            base_imdir_local = base_imdir
-        
-        # Get paths to scenefile-specific image directories relative to local machine: 
-        j = lambda x : os.path.join(base_imdir_local, x.scenefile.split('/')[-1][:-5])
-        trial_params_df['sfile_imdir'] = trial_params_df.apply(j,axis=1)
-        
-        # Create dataframe of unique images:
-        unique_images = trial_params_df[['sfile_imdir', 'stim_idx']].drop_duplicates()
-        unique_images = unique_images.sort_values(by=['sfile_imdir', 'stim_idx'])
-        
-        # Get all PNGs in base_imdir:
-        all_pngs = []
-        for s in sfile_imdirs:
-            pngs = [os.path.join(s,x) for x in os.listdir(s) if re.search('_index\d+.png',x) is not None]
-            all_pngs += pngs
-            
-        # Find saved PNGs matching rows of unique_images:
-        find_matching_pngs = lambda x : [y for y in all_pngs if x.sfile_imdir in y and '_index{}.png'.format(x.stim_idx) in y]
-        matching_pngs = unique_images.apply(find_matching_pngs, axis=1)
-        matching_pngs = [y[0] if len(y)>0 else None for y in matching_pngs] # < Take first matching PNG if it exists, otherwise use None; ASSUMING FIRST MATCHING PNG IS THE SAME AS OTHERS
-        matching_pngs = [os.path.join(os.path.sep.join(base_imdir.split(os.path.sep)[0:4]), os.path.sep.join(x.split(os.path.sep)[1:])) for x in matching_pngs] # Convert local paths back to relative to axon:
-        matching_pngs = ['/' + x.replace(os.path.sep, '/') for x in matching_pngs]
-        unique_images['img_full_path'] = matching_pngs
-            
-        # Merge unique images with full paths to trial_params_df:
-        trial_params_df = pd.merge(trial_params_df, unique_images, on=['sfile_imdir', 'stim_idx'], how='outer')
+    # Merge unique images with full paths to trial_params_df:
+    trial_params_df = pd.merge(trial_params_df, unique_images_df, on=['scenefile', 'stim_idx'], how='outer')    
 
     return trial_params_df
 
@@ -935,6 +904,8 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
 
 def stim_idx_2_img_path(sfile_img_dir, stim_idx):
     
+    stim_idx = int(stim_idx)
+    print('foo')
     matching_imgs = [x for x in os.listdir(sfile_img_dir) if '_index{}.png'.format(stim_idx) in x] # Get all PNGs in base_imdir:       
     
     # If one or more images with matching index discovered:
