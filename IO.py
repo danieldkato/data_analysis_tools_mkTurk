@@ -703,6 +703,21 @@ def standardize_col_types(df):
 
 def find_im_full_paths(trial_params_df, local_data_path=None):
     
+    # Get saved image directories for all scenefiles:    
+    sfiles = np.unique(trial_params_df.scenefile)
+    sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
+    
+    # HACK; data_dicts appear to include a mistake where stim indices are 
+    # off by some offset; correct here:
+    sfile_imdirs = np.unique(trial_params_df.sfile_imdir)
+    for s in sfile_imdirs:
+        curr_rows = trial_params_df.sfile_imdir == s
+        trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
+    
+    
+    
+    
+    
     # Try to find base image directory:
     base_imdir = find_saved_imgs_dir(trial_params_df)
     
@@ -722,13 +737,6 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         # Get paths to scenefile-specific image directories relative to local machine: 
         j = lambda x : os.path.join(base_imdir_local, x.scenefile.split('/')[-1][:-5])
         trial_params_df['sfile_imdir'] = trial_params_df.apply(j,axis=1)
-        
-        # HACK; data_dicts appear to include a mistake where stim indices are 
-        # off by some offset; correct here:
-        sfile_imdirs = np.unique(trial_params_df.sfile_imdir)
-        for s in sfile_imdirs:
-            curr_rows = trial_params_df.sfile_imdir == s
-            trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
         
         # Create dataframe of unique images:
         unique_images = trial_params_df[['sfile_imdir', 'stim_idx']].drop_duplicates()
@@ -922,4 +930,27 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
         raise AssertionError('Scenefile directory for {} not found in {}'.format(sfile_basename, expt_directory))
     
     return img_dir
+
+
+
+def stim_idx_2_img_path(sfile_img_dir, stim_idx):
+    
+    matching_imgs = [x for x in os.listdir(sfile_img_dir) if '_index{}.png'.format(stim_idx) in x] # Get all PNGs in base_imdir:       
+    
+    # If one or more images with matching index discovered:
+    if len(matching_imgs) >= 1:
+        
+        # Raise warning if more than one match:
+        if len(matching_imgs) > 1:
+            warnings.warn('More than one image with index {} discovered in {}; returning path to first image.'.format(stim_idx, sfile_img_dir))
+        
+        imname = matching_imgs[0] # Just selecting first image if there are duplicate images with same index; assuming that's fine for now
+        impath = os.path.join(sfile_img_dir, imname)
+    
+    # If no images with matching indices discovered:
+    else:
+        warnings.warn('No images with index {} discovered in {}; returning None.'.format(stim_idx, sfile_img_dir))
+        impath =None
+    
+    return impath
         
