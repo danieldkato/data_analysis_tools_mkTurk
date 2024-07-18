@@ -712,7 +712,8 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     if np.any(['ABC' in x for x in sfiles]):
         
         # Find experiment directories for novel scene
-        novel_img_dirs = [x for x in sfile_saved_img_dirs if 'UVW' in x or 'XYZ' in x]
+        print('sfile_saved_img_dirs={}'.format(sfile_saved_img_dirs))
+        novel_img_dirs = [x for x in sfile_saved_img_dirs if x is not None and ('UVW' in x or 'XYZ' in x)]
         novel_exp_dirs = []
         for n in novel_img_dirs:
             novel_exp_dirs.append(n.split(os.path.sep)[-2])
