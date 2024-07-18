@@ -712,7 +712,6 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     if np.any(['ABC' in x for x in sfiles]):
         
         # Find experiment directories for novel scene
-        print('sfile_saved_img_dirs={}'.format(sfile_saved_img_dirs))
         novel_img_dirs = [x for x in sfile_saved_img_dirs if x is not None and ('UVW' in x or 'XYZ' in x)]
         novel_exp_dirs = []
         for n in novel_img_dirs:
@@ -860,7 +859,7 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
         # If stim set is greater than or equal to 5, try to additionally get experiment ID:
         elif stim_set >= 5:
             
-            expt_regex = '_\d+[A-Z]{3,}\d*_\d{2,2}'
+            expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
             expt_search = re.search(expt_regex, scenefile_name)
             if expt_search is not None:
                 expt_str = expt_search.group()[-2:]
@@ -919,7 +918,7 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     
     # Find directory in expt_directory with same name as scenefile basename:
     if not os.path.exists(expt_directory):
-        raise AssertionError('Experiment directory for scenefile {} not found in saved image folder.'.format(scenefile_name))
+        raise AssertionError('Experiment directory for scenefile {} not found in saved image folder {}.'.format(scenefile_name, expt_directory))
     expt_dir_contents = os.listdir(expt_directory)
     if sfile_basename in expt_dir_contents:
         img_dir = os.path.join(expt_directory, sfile_basename)
