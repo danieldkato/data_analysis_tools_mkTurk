@@ -729,7 +729,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
             for i, s in enumerate(sfile_saved_img_dirs):
                 if s is not None and 'ABC' in s:
                     sfile_parts = s.split(os.path.sep)
-                    sfile_parts[4] = novel_exp_dir 
+                    sfile_parts[-2] = novel_exp_dir 
                     new_sfile = os.path.sep.join(sfile_parts)
                     sfile_saved_img_dirs[i] = new_sfile
     
@@ -757,6 +757,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     tmp['scenefile'] = sfiles
     tmp['sfile_imdir'] = sfile_saved_img_dirs
     unique_images_df = pd.merge(unique_images_df, tmp, on=['scenefile'], how='outer')
+    #print('sfile_saved_img_dirs={}'.format(np.array(sfile_saved_img_dirs)))
     
     # Get full paths to saved images, add to dataframe:
     impaths = unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
