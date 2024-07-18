@@ -946,7 +946,7 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
 
 def stim_idx_2_img_path(sfile_img_dir, stim_idx):
     
-    if sfile_img_dir is None or stim_idx is None:
+    if sfile_img_dir is None or stim_idx is None or not os.path.exists(sfile_img_dir):
         return None
     
     stim_idx = int(stim_idx)
