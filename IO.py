@@ -887,6 +887,13 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
         # Random exception handling:
         if monkey == 'West':
             expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
+       
+        
+    ###
+    # Otherwise, raise warning and return None
+    else:
+        warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
+        return None
     
     # Find directory in expt_directory with same name as scenefile basename:
     if not os.path.exists(expt_directory):
