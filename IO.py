@@ -703,6 +703,10 @@ def standardize_col_types(df):
 
 def find_im_full_paths(trial_params_df, local_data_path=None):
     
+    # If input dataframe already has img_full_path columns, delete it; will replace
+    if 'img_full_path' in trial_params_df.columns:
+        trial_params_df = trial_params_df.drop(columns=['img_full_path'])
+    
     # Try to find saved image directories for all scenefiles:    
     sfiles = np.unique(trial_params_df.scenefile)
     sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
