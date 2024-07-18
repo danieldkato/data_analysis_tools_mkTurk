@@ -722,7 +722,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
             novel_exp_dir = novel_exp_dirs[0]
             
             for i, s in enumerate(sfile_saved_img_dirs):
-                if 'ABC' in s:
+                if s is not None and 'ABC' in s:
                     sfile_parts = s.split(os.path.sep)
                     sfile_parts[4] = novel_exp_dir 
                     new_sfile = os.path.sep.join(sfile_parts)
