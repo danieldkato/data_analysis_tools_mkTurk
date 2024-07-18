@@ -904,7 +904,6 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
 def stim_idx_2_img_path(sfile_img_dir, stim_idx):
     
     stim_idx = int(stim_idx)
-    print('foo')
     matching_imgs = [x for x in os.listdir(sfile_img_dir) if '_index{}.png'.format(stim_idx) in x] # Get all PNGs in base_imdir:       
     
     # If one or more images with matching index discovered:
