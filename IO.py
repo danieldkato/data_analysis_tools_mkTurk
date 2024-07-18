@@ -703,8 +703,9 @@ def standardize_col_types(df):
 
 def find_im_full_paths(trial_params_df, local_data_path=None):
     
-    # Get saved image directories for all scenefiles:    
+    # Try to find saved image directories for all scenefiles:    
     sfiles = np.unique(trial_params_df.scenefile)
+    sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
     sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
     
     # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
@@ -728,6 +729,18 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
                     new_sfile = os.path.sep.join(sfile_parts)
                     sfile_saved_img_dirs[i] = new_sfile
     
+    # HACK: If any scenefiles are missing an experiment directory, and if all 
+    # other scenefiles are in the same known experiment directory, then just 
+    # assume all scenefiles are in that same known experiment directory; in a
+    # worst case scenario, the search will fail at the call to stim_idx_2_img_path
+    # below and return None.
+    expt_dirs = [x.split(os.path.sep)[-2] for x in sfile_saved_img_dirs if x is not None]
+    if len(np.unique(expt_dirs)) == 1:
+        base = [x for x in sfile_saved_img_dirs if x is not None][0].split(os.path.sep)[:-2]
+        base = os.path.sep.join(base)
+        expt_dir = expt_dirs[0]
+        sfile_saved_img_dirs = [os.path.join(base, expt_dir, x) for x in sfile_basenames]
+     
     # HACK: data_dicts appear to include a mistake where stim indices are 
     # off by some offset; correct here:
     for s in sfiles:
