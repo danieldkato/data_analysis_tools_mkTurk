@@ -707,7 +707,28 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     sfiles = np.unique(trial_params_df.scenefile)
     sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
     
-    # HACK; data_dicts appear to include a mistake where stim indices are 
+    # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
+    # those inside experiment directory for UVW, XYZ:
+    if np.any(['ABC' in x for x in sfiles]):
+        
+        # Find experiment directories for novel scene
+        novel_img_dirs = [x for x in sfile_saved_img_dirs if 'UVW' in x or 'XYZ' in x]
+        novel_exp_dirs = []
+        for n in novel_img_dirs:
+            novel_exp_dirs.append(n.split(os.path.sep)[-2])
+        
+        # If all novel scenefiles are from the same experiment:
+        if len(np.unique(novel_exp_dirs)) == 1:
+            novel_exp_dir = novel_exp_dirs[0]
+            
+            for i, s in enumerate(sfile_saved_img_dirs):
+                if 'ABC' in s:
+                    sfile_parts = s.split(os.path.sep)
+                    sfile_parts[4] = novel_exp_dir 
+                    new_sfile = os.path.sep.join(sfile_parts)
+                    sfile_saved_img_dirs[i] = new_sfile
+    
+    # HACK: data_dicts appear to include a mistake where stim indices are 
     # off by some offset; correct here:
     for s in sfiles:
         curr_rows = trial_params_df.scenefile == s
