@@ -918,12 +918,14 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     
     # Find directory in expt_directory with same name as scenefile basename:
     if not os.path.exists(expt_directory):
-        raise AssertionError('Experiment directory for scenefile {} not found in saved image folder {}.'.format(scenefile_name, expt_directory))
+        warnings.warn('Experiment directory for scenefile {} not found in saved image folder {}; returning None.'.format(scenefile_name, expt_directory))
+        return None
     expt_dir_contents = os.listdir(expt_directory)
     if sfile_basename in expt_dir_contents:
         img_dir = os.path.join(expt_directory, sfile_basename)
     else:
-        raise AssertionError('Scenefile directory for {} not found in {}'.format(sfile_basename, expt_directory))
+        warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
+        return None
     
     return img_dir
 
