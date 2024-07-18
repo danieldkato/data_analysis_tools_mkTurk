@@ -709,9 +709,8 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     
     # HACK; data_dicts appear to include a mistake where stim indices are 
     # off by some offset; correct here:
-    sfile_imdirs = np.unique(trial_params_df.sfile_imdir)
-    for s in sfile_imdirs:
-        curr_rows = trial_params_df.sfile_imdir == s
+    for s in sfiles:
+        curr_rows = trial_params_df.scenefile == s
         trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
     
     # Create dataframe of unique images, add image directories:
