@@ -602,7 +602,7 @@ def select_channels(df, channels):
 
 
 
-def visual_drive(trial_df, baseline_window, psth_bins, sig=1, classes=None, 
+def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None, 
      smooth_window=None):
     """
     Find channels that are significantly visually driven by any of a given set 
@@ -657,6 +657,19 @@ def visual_drive(trial_df, baseline_window, psth_bins, sig=1, classes=None,
         stim_id_rows = trial_df.loc[B]
         unique_stim_ids = np.unique(stim_id_rows.stim_id)
         classes = [[x] for x in unique_stim_ids]
+        
+    # Try to find psth_bin edges from input dataframe by default (maybe this should be a function):
+    try: 
+        P = np.array(list(trial_df['psth_bins']))
+        # If all bin edges are the same, use bin edges from first trial:
+        if sum(np.ptp(P,axis=0)) == 0:
+            psth_bins = trial_df.iloc[0].psth_bins
+    # Otherwise try to get bin edges from input param:
+    except KeyError:
+        psth_bins = psth_bins
+    # If still can't find bin edges, raise error:
+    if psth_bins is None:
+        raise AssertionError('Could not find PSTH bin edges.')
 
     # Compute indices of baseline period:
     bl_edge_indices = time_window2bin_indices(baseline_window, psth_bins)
