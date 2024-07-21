@@ -499,7 +499,7 @@ def rsvp_from_df(df, stim_inds):
 
 
 
-def df_2_psth_mat(df):
+def df_2_psth_mat(df, dtype=np.float64):
     """
     Convert spike counts encoded in dataframe to numpy array.
 
@@ -520,7 +520,7 @@ def df_2_psth_mat(df):
 
     """
     
-    data = np.array(list(df.psth))
+    data = np.array(list(df.psth)).astype(dtype)
     
     # If data are 3-dimensional, assume repeat-by-channel-by-timebin
     if len(data.shape)==3:
