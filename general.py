@@ -951,7 +951,7 @@ def get_ch_stdev(df, baseline_window, psth_bins):
 
 
 
-def zscore_df(df, baseline_window, psth_bins, reference='baseline'):
+def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
     """
     Z-score spike counts in dataframe.
 
@@ -980,6 +980,19 @@ def zscore_df(df, baseline_window, psth_bins, reference='baseline'):
         raw spike counts.
 
     """
+    
+    # Try to find psth_bin edges from input dataframe by default (maybe this should be a function):
+    try: 
+        P = np.array(list(df['psth_bins']))
+        # If all bin edges are the same, use bin edges from first trial:
+        if sum(np.ptp(P,axis=0)) == 0:
+            psth_bins = df.iloc[0].psth_bins
+    # Otherwise try to get bin edges from input param:
+    except KeyError:
+        psth_bins = psth_bins
+    # If still can't find bin edges, raise error:
+    if psth_bins is None:
+        raise AssertionError('Could not find PSTH bin edges.')
     
     # Zero-center baseline period for each trial:
     dfz = bl_subtract_data(deepcopy(df), baseline_window, psth_bins)
