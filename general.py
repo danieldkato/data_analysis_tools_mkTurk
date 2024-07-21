@@ -719,6 +719,8 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         
         curr_class_filter = [np.any(x==cl_ar) for x in rsvp0_rows.stim_id]
         curr_class_rows = rsvp0_rows.loc[curr_class_filter] # c-by-b-by-s 
+        if curr_class_rows.shape[0] == 0: # If there are no RSVP 0 presentations of the current stim, move on to the next one
+            continue
         
         # Center each trial around 0:
         curr_class_rows_centered = bl_subtract_data(curr_class_rows, baseline_window, psth_bins)
