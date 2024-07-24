@@ -643,6 +643,9 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
 
     Returns
     -------
+    max_responses : numpy.ndarray
+        [TODO : add]
+    
     visually_driven : numpy.ndarray
         Array of indices of visually-driven channels. Note these are indices into
         rows of elements of `trial_df.psth`, which may not be absolute channel
@@ -705,9 +708,10 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
     sds = np.nanstd(all_bline_reshape, axis=1) 
     #"""
     
-    # Initialize array saying whether each channel is significantly deflected:
+    # Initialize arrays 
     #n_channels = len(sds)
-    B = np.zeros((n_channels, len(classes)))
+    P = np.zeros((n_channels, len(classes))) # < Whether each channel is significantly deflected
+    R = np.zeros((n_channels, len(classes))) # < Response of each channel to each stim
     
     # Iterate over classes:
     for cx, cl in enumerate(classes):
@@ -746,14 +750,18 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         #sig_deflection = np.abs(curr_class_means - curr_class_bline_means) > sig * sds
         
         # Update table:
-        B[:, cx] = sig_deflection
+        P[:, cx] = sig_deflection
+        R[:, cx] = curr_class_means
         
     # Test whether each channel significantly deflects above specified number
     # of standard deviations for *any* requested class:    
-    B = np.any(B, axis=1)
-    visually_driven = np.where(B)[0]
+    P = np.any(P, axis=1)
+    visually_driven = np.where(P)[0]
         
-    return visually_driven
+    # Take max response of each channel to any stimulus:
+    max_responses = np.max(R, axis=1)
+        
+    return visually_driven, max_responses
 
 
 
