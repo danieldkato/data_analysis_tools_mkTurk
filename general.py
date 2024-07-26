@@ -1014,7 +1014,7 @@ def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
     
     # Create matrix of stdevs, multiply all activity:
     smat = np.zeros((n_channels, n_channels))
-    smat = np.fill_diagonal(smat, 1/stdevs)
+    np.fill_diagonal(smat, 1/stdevs)
     df['psth'] = df.apply(lambda x : np.matmul(smat, x.psth), axis=1)
     
     return df
