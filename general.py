@@ -988,9 +988,9 @@ def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
     bline_bin_edges = time_window2bin_indices(baseline_window, psth_bins)
     
     # Try to find number of channels; raise error if not consistent across repeats:
-    n_chans_per_rep = df.apply(lambda x : np.shape(x.psth)[0], axis=1) 
+    n_chans_per_rep = df.apply(lambda x : x.psth.shape[0], axis=1) 
     if np.ptp(n_chans_per_rep) == 0:
-        n_channels = n_chans_per_rep[0]
+        n_channels = n_chans_per_rep.iloc[0]
     else:
         raise AssertionError('Different numbers of channels detected on different trials.')
     
