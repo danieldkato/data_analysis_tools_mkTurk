@@ -807,7 +807,7 @@ def get_bl_data(trial_df, baseline_window, psth_bins):
     
 
 
-def bl_subtract_data(df, baseline_window, psth_bins):
+def bl_subtract_data(psth, baseline_window, psth_bins):
     """
     Subtract mean baseline epoch activity for all stimulus presentations. Works 
     on a repeat-by-repeat basis, so that all activity for a given repeat has the 
@@ -816,11 +816,8 @@ def bl_subtract_data(df, baseline_window, psth_bins):
 
     Parameters
     ----------
-    df : pandas.core.frame.DataFrame
-        Dataframe containing spike count data. Must define column 'psth'. 
-        Each element of the 'psth' column must be a c-by-b array, where c is 
-        the number of channels and b is the number of timebins per
-        peristimulus period..
+    psth : pandas.core.frame.DataFrame
+        Channels-by-timebins array of spike counts. 
     
     baseline_window : array-like
         2-element list or array specifying time window that counts as baseline.
@@ -834,33 +831,19 @@ def bl_subtract_data(df, baseline_window, psth_bins):
 
     Returns
     -------
-    df : pandas.core.frame.DataFrame
-        Same as input, except data for each repeat has had its mean baseline 
+    psth : pandas.core.frame.DataFrame
+        Same as input, except data for each channel has had its mean baseline 
         activity subtracted from it.
 
     """
     
-    # Get whole-trial data:
-    wholetrial_data = df_2_psth_mat(df) # < c-by-b-by-s
-    n_bins = wholetrial_data.shape[1] 
+    edge_bins = time_window2bin_indices(baseline_window, psth_bins)
+    bline_dat = psth[:,edge_bins[0]:edge_bins[1]]
+    mu = np.mean(bline_dat, axis=1)
+    Mu = np.matlib.repmat(np.expand_dims(mu, axis=1), 1, psth.shape[1])
+    psth = psth - Mu
     
-    # Get baseline period data:
-    df_bl = get_bl_data(df, baseline_window, psth_bins)
-    bl_data = df_2_psth_mat(df_bl)
-    
-    # Mean across baseline-epoch bins for all channels, repeats:
-    mu = np.mean(bl_data, axis=1) # < c-by-s; i,j-th element mean baseline-epoch activity for i-th channel on j-th stim presentation
-    M = np.array([mu] * n_bins) # < b-by-c-by-s
-    M = np.transpose(M, axes=[1, 0, 2]) # < c-by-b-by-s
-    
-    # Subtract mean baseline for each channel, trial from all data:
-    bl_subtracted_dat = wholetrial_data - M 
-    
-    # Deal data back to input dataframe:
-    bl_subtracted_dat = np.transpose(bl_subtracted_dat, axes=[2, 0, 1]) # < s-by-c-by-b
-    df.psth = list(bl_subtracted_dat)
-    
-    return df
+    return psth
 
 
 
