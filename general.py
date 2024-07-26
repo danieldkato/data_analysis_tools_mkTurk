@@ -1004,7 +1004,7 @@ def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
         
     # Get stdev just from baseline period data:
     elif reference == 'baseline':
-        data = df['psth'].apply(lambda x : x.psth[bline_bin_edges[0]:bline_bin_edges[1],:])
+        data = df.apply(lambda x : x.psth[bline_bin_edges[0]:bline_bin_edges[1],:], axis=1)
         data = np.concatenate(list(data), axis=1)
         stdevs = np.nanstd(data, axis=1)# < channels-element array
     
