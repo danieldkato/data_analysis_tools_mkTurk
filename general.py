@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
 from data_analysis_tools_mkTurk.utils_mkturk import expand_sess_scenefile2stim
 from data_analysis_tools_mkTurk.npix import get_site_coords, partition_adjacent_channels
+import gc
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -984,35 +985,39 @@ def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
     # If still can't find bin edges, raise error:
     if psth_bins is None:
         raise AssertionError('Could not find PSTH bin edges.')
+    bline_bin_edges = time_window2bin_indices(baseline_window, psth_bins)
+    
+    # Try to find number of channels; raise error if not consistent across repeats:
+    n_chans_per_rep = df.apply(lambda x : np.shape(x.psth)[0], axis=1) 
+    if np.ptp(n_chans_per_rep) == 0:
+        n_channels = n_chans_per_rep[0]
+    else:
+        raise AssertionError('Different numbers of channels detected on different trials.')
     
     # Zero-center baseline period for each trial:
-    dfz = bl_subtract_data(deepcopy(df), baseline_window, psth_bins)
-    data = df_2_psth_mat(dfz) # < channels-by-timebins-by-repeats
-    n_channels = data.shape[0]
-    n_bins = data.shape[1]
-    n_repeats = data.shape[2]
+    df['psth'] = df.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
     
     # Get stdev from whole time series:
     if reference == 'full':
-        concat_tseries = np.reshape(data, (n_channels, n_bins*n_repeats), order='F')
-        stdevs = np.nanstd(concat_tseries, axis=1)
-    
+        data = np.concatenate(list(df['psth']), axis=1)
+        stdevs = np.nanstd(data, axis=1)
+        
     # Get stdev just from baseline period data:
     elif reference == 'baseline':
-        stdevs = get_ch_stdev(df, baseline_window, psth_bins) # < channels-element array
-        
-    stdevs = np.matlib.repmat(np.expand_dims(stdevs,1), 1, n_bins) # < channels-by-timebins
-    stdevs = np.array([stdevs] * n_repeats) # < repeats-by-channels-by-timebins
-    stdevs = np.transpose(stdevs, axes=[1, 2, 0]) # < channels-by-timebins-by-repeats
+        data = df['psth'].apply(lambda x : x.psth[bline_bin_edges[0]:bline_bin_edges[1],:])
+        data = np.concatenate(list(data), axis=1)
+        stdevs = np.nanstd(data, axis=1)# < channels-element array
     
-    # Divide by channel-specific standard deviation: 
-    Z = np.multiply(data, 1/stdevs) # < channels-by-timebins-by-repeats
+    # Garbage collection:
+    del data
+    gc.collect()
     
-    # Deal z-scored data back to dataframe:
-    Z = np.transpose(Z, axes=[2, 0, 1])
-    dfz.psth = list(Z)
+    # Create matrix of stdevs, multiply all activity:
+    smat = np.zeros((n_channels, n_channels))
+    smat = np.fill_diagonal(smat, 1/stdevs)
+    df['psth'] = df.apply(lambda x : np.matmul(smat, x.psth), axis=1)
     
-    return dfz
+    return df
 
 
 
