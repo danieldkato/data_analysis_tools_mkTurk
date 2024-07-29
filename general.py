@@ -259,6 +259,46 @@ def compute_selectivity(data, class0, class1, selectivity_metric='dprime'):
 
 
 
+def df_2_psth_bins(df):
+    """
+    Try to find PSTH bin edges (relative to screen flip) for all repeats in a 
+    dataframe of PSTHs. Returns an array of bin edges if the same for all repeats,
+    None otherwise. 
+
+    Parameters
+    ----------
+    df : pandas.core.frame.DataFrame
+        Dataframe to try to find PSTH bin edges for.
+
+    Returns
+    -------
+    psth_bins : numpy.ndarray | None
+        Array of bin edges if the same for all repeats, None otherwise.
+
+    """
+    
+    psth_bins = None # < Set default
+    
+    # Try to find psth_bin edges from input dataframe by default (maybe this should be a function):
+    try: 
+        P = np.array(list(df['psth_bins']))
+        # If all bin edges are the same, use bin edges from first trial:
+        if sum(np.ptp(P,axis=0)) == 0:
+            psth_bins = df.iloc[0].psth_bins
+            
+    # Otherwise try to get bin edges from input param:
+    except KeyError:
+        pass
+    
+    # If can't find bin edges, raise warining:
+    if psth_bins is None:
+        warnings.warn('Could not find PSTH bin edges; returning None.')
+    
+    return psth_bins
+    
+
+
+
 def get_stim_timing_metadata(stim_conditions_meta):
     
     # Get bin widths:
