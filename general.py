@@ -689,24 +689,17 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
     
     # Extract only rows corresponding to RSVP=0 stimulus presentations:
     rsvp0_rows = trial_df[trial_df.rsvp_num==0]
-    print('rsvp0_rows.shape={}'.format(rsvp0_rows.shape))
-    all_data = df_2_psth_mat(rsvp0_rows)
-    n_channels = all_data.shape[0]
-    n_bins = all_data.shape[1]
-    n_repeats = all_data.shape[2]
-
-    # Baseline-subtract all trials so that baseline period is always centered around 0:
-    all_bline = all_data[:, bl_indices, :] 
-    mean_bline_by_trial = np.mean(all_bline, axis=1)
-    M = [mean_bline_by_trial] * n_bins
-    N = np.array(M)
-    P = np.transpose(N, axes=[1, 0, 2])
-    all_data_centered = all_data - P
+    all_rsvp0_data = df_2_psth_mat(rsvp0_rows)
     
-    # Get overall pre-trial standard deviation for each channel: 
-    all_bline_centered = all_data_centered[:, bl_indices, :]     
-    all_bline_reshape = np.reshape(all_bline_centered, (n_channels, len(bl_indices)*n_repeats), order='F')
-    sds = np.nanstd(all_bline_reshape, axis=1) 
+    # Extract only pre-trial baseline period data, compute standard dev:
+    all_bline = all_rsvp0_data[:, bl_indices, :] 
+    n_channels = all_bline.shape[0]
+    n_bins = all_bline.shape[1]
+    n_repeats = all_bline.shape[2]
+    all_bline_reshape = np.reshape(all_bline, (n_channels, len(bl_indices)*n_repeats), order='F')
+    sds = np.nanstd(all_bline_reshape, axis=1)     
+    
+
     #"""
     
     # Initialize arrays 
