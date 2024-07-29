@@ -715,8 +715,7 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         else:
             cl_ar = cl
         
-        curr_class_filter = [np.any(x==cl_ar) for x in rsvp0_rows.stim_id]
-        curr_class_rows = rsvp0_rows.loc[curr_class_filter] # c-by-b-by-s 
+        curr_class_rows = rsvp0_rows[rsvp0_rows.stim_id.isin(cl_ar)] # c-by-b-by-s 
         if curr_class_rows.shape[0] == 0: # If there are no RSVP 0 presentations of the current stim, move on to the next one
             continue
         
