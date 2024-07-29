@@ -680,7 +680,7 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
     bl_indices = np.arange(bl_edge_indices[0], bl_edge_indices[1])
 
     # Baseline-subtract all trials:
-    trial_df = bl_subtract_data(trial_df, baseline_window, psth_bins)
+    trial_df['psth'] = trial_df.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
 
     # Compute stdev for all channels:
     #sds = get_ch_stdev(trial_df, baseline_window, psth_bins)
