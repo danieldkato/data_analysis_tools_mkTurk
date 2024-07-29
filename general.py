@@ -712,6 +712,8 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         
         if type(cl) == list:
             cl_ar = np.array(cl)
+        elif type(cl) == str:
+            cl_ar = np.array([cl])
         else:
             cl_ar = cl
         
