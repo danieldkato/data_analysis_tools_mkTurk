@@ -679,17 +679,17 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
     bl_edge_indices = time_window2bin_indices(baseline_window, psth_bins)
     bl_indices = np.arange(bl_edge_indices[0], bl_edge_indices[1])
 
+    # Extract only rows corresponding to RSVP=0 stimulus presentations:
+    rsvp0_rows = trial_df[trial_df.rsvp_num==0]
+
     # Baseline-subtract all trials:
-    trial_df['psth'] = trial_df.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
+    rsvp0_rows['psth'] = rsvp0_rows.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
+    all_rsvp0_data = df_2_psth_mat(rsvp0_rows)
 
     # Compute stdev for all channels:
     #sds = get_ch_stdev(trial_df, baseline_window, psth_bins)
 
     #"""
-    
-    # Extract only rows corresponding to RSVP=0 stimulus presentations:
-    rsvp0_rows = trial_df[trial_df.rsvp_num==0]
-    all_rsvp0_data = df_2_psth_mat(rsvp0_rows)
     
     # Extract only pre-trial baseline period data, compute standard dev:
     all_bline = all_rsvp0_data[:, bl_indices, :] 
