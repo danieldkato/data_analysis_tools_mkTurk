@@ -719,11 +719,8 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         if curr_class_rows.shape[0] == 0: # If there are no RSVP 0 presentations of the current stim, move on to the next one
             continue
         
-        # Center each trial around 0:
-        curr_class_rows_centered = bl_subtract_data(curr_class_rows, baseline_window, psth_bins)
-        
         # Average over individual presentations:
-        curr_class_data = df_2_psth_mat(curr_class_rows_centered)
+        curr_class_data = df_2_psth_mat(curr_class_rows)
         curr_class_means = np.nanmean(curr_class_data, axis=2) # c-by-b
         
         # Smooth mean PSTH:
