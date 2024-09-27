@@ -942,9 +942,21 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     if sfile_basename in expt_dir_contents:
         img_dir = os.path.join(expt_directory, sfile_basename)
     else:
-        warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
-        return None
-    
+        
+        #HACK: If scenefile folder not found in experiment directory, check E6 folder instead:
+        e6_dir = os.path.join(monkey_dir, 'Saved_Images_{}_neural_stim_{}_E6'.format(monkey, stim_set))
+        
+        if os.path.exists(e6_dir):
+            e6_contents = os.listdir(e6_dir)
+            if sfile_basename in e6_contents:
+                img_dir = os.path.join(e6_dir, sfile_basename)
+            else:
+                warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
+                return None
+        else:
+            warnings.warn('Scenefile directory for {} not found; returning None.'.format(sfile_basename))
+            img_dir = None
+            
     return img_dir
 
 
