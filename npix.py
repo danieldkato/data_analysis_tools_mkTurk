@@ -461,6 +461,13 @@ def date_2_chs(date):
             'PH' : [0, 65]
             },     
         
+        '20240816' : {
+            'IT': [175, 320],
+            'WM' : [14, 175],
+            'HC' : None,
+            'PH' : None
+            },     
+        
         }
     
     if date not in ch_lookup.keys():
