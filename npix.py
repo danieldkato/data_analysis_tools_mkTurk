@@ -312,7 +312,7 @@ def get_session_chs(date, region=None):
             else:
                 return None
     else:
-        channels = list(np.arange(384))
+        return None
     
     # Sort and find unique:
     channels = list(np.sort(np.unique(channels)))
