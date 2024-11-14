@@ -1052,6 +1052,77 @@ def zscore_df(df, baseline_window, psth_bins=None, reference='baseline'):
 
 
 
+def drpime_by_channel(df, classes, analysis_window=None, psth_bins=None):
+    
+    # d' is only for two classes, raise error if len(classes) > 2
+    if len(classes) > 2:
+        raise ValueError('List of classses to compute d'' for must include exactly two elements.')
+    
+    # Find PSTH bins if necessary:
+    if psth_bins is None:
+        
+        try:
+            P = np.array(list(df.psth_bins))
+        except ValueError:
+            print('Different repeats associated with different numbers of PSTH bins.')
+            
+        if np.sum(np.ptp(P)) == 0:
+            psth_bins = P[0,:]  
+        else: 
+            raise AssertionError('Different repearts associated with different PSTH bins.')
+        
+    # Find time bins interest based on requesetd analysis window:            
+    if analysis_window is not None:
+        print('')
+        
+        
+    for cl in classes:
+        print('')
+    
+        curr_rows = rsvp_from_df(df, cl)
+        curr_data = np.array(list(df.psth))
+        # take data only from requested time window
+
+
+    """    
+    # Iterate over repeats:    
+    for n in np.arange(n_repeats):
+        
+        
+    
+    
+
+    # Iterate over classes:
+    for cl in classes:
+
+        curr_class_rows = rsvp_from_df(df, cl)        
+        n_repeats = curr_class_rows.shape[0]
+        n_reps_per_split = int(np.floor(n_repeats/2))
+
+        # Iterate over repeats:
+        for n in np.arange(n_repeats):
+            
+            # Shuffle:
+            curr_shuf = curr_class_rows.sample(frac=1)
+                    
+            # Split repeats:
+            spl0 = curr_class_rows.iloc[0:n_reps_per_split]
+            spl1 = curr_class_rows.iloc[n_reps_per_split:]
+            
+            # Take averages within each split:
+            spl0_dat = np.array(list(spl0.psth))
+            spl0_mu = np.nanmean(spl0_dat, axis=0)
+            
+            spl1_dat = np.array(list(spl1.psth))
+            spl1_mu = np.nanmean(spl1_dat, axis=0)
+    
+            # Correlate between splits: 
+    """      
+    
+    return
+
+
+
 def partition_list(L, partition_size):
     """
     Partition an ordered list into a list of smaller, disjoint lists. If the
