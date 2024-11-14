@@ -286,6 +286,9 @@ def get_session_chs(date, region=None):
     # Hack-y, relies on extremely hack-y date_2_chs() function; try to find a 
     # better way of doing this eventually
     
+    if region == 'all':
+        return np.arange(384)
+    
     session_dict = date_2_chs(date)
     if session_dict is not None:
         
@@ -440,6 +443,13 @@ def date_2_chs(date):
             'PH' : [70, 250]
             }, 
 
+        '20240408' : {
+            'IT': [285, 350],
+            'WM' : [180, 285],
+            'HC' : [0, 180],
+            'PH' : None
+            }, 
+
         '20240409' : {
             'IT': [320, 383],
             'WM' : [290, 320],
@@ -447,11 +457,25 @@ def date_2_chs(date):
             'PH' : None
             }, 
 
-        '20240417' : {
-            'IT': [160, 332],
-            'WM' : None,
+        '20240410' : {
+            'IT': [285, 330],
+            'WM' : [230, 285],
             'HC' : None,
-            'PH' : [0, 160]
+            'PH' : [0, 60]
+            }, 
+
+        '20240412' : {
+            'IT': [240, 270],
+            'WM' : [150, 240],
+            'HC' : None,
+            'PH' : [0, 150]
+            }, 
+
+        '20240417' : {
+            'IT': [275, 300],
+            'WM' : [195, 275],
+            'HC' : None,
+            'PH' : [0, 190]
             },         
         
         '20240418' : {
