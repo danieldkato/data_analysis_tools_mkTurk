@@ -707,64 +707,74 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     if 'img_full_path' in trial_params_df.columns:
         trial_params_df = trial_params_df.drop(columns=['img_full_path'])
     
-    # Try to find saved image directories for all scenefiles:    
-    sfiles = np.unique(trial_params_df.scenefile)
-    sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
-    sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
+    # Iterate over dates:
+    unique_images_df = pd.DataFrame()
+    dates = np.unique(trial_params_df.date)
+    for date in dates:
     
-    # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
-    # those inside experiment directory for UVW, XYZ:
-    if np.any(['ABC' in x for x in sfiles]):
+        curr_date_trial_params = trial_params_df[trial_params_df.date==date]
         
-        # Find experiment directories for novel scene
-        novel_img_dirs = [x for x in sfile_saved_img_dirs if x is not None and ('UVW' in x or 'XYZ' in x)]
-        novel_exp_dirs = []
-        for n in novel_img_dirs:
-            novel_exp_dirs.append(n.split(os.path.sep)[-2])
+        # Try to find saved image directories for all scenefiles:    
+        sfiles = np.unique(curr_date_trial_params.scenefile)
+        sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
+        sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
         
-        # If all novel scenefiles are from the same experiment:
-        if len(np.unique(novel_exp_dirs)) == 1:
-            novel_exp_dir = novel_exp_dirs[0]
+        # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
+        # those inside experiment directory for UVW, XYZ:
+        if np.any(['ABC' in x for x in sfiles]):
             
-            for i, s in enumerate(sfile_saved_img_dirs):
-                if s is not None and 'ABC' in s:
-                    sfile_parts = s.split(os.path.sep)
-                    sfile_parts[-2] = novel_exp_dir 
-                    new_sfile = os.path.sep.join(sfile_parts)
-                    sfile_saved_img_dirs[i] = new_sfile
-    
-    # HACK: If any scenefiles are missing an experiment directory, and if all 
-    # other scenefiles are in the same known experiment directory, then just 
-    # assume all scenefiles are in that same known experiment directory; in a
-    # worst case scenario, the search will fail at the call to stim_idx_2_img_path
-    # below and return None.
-    expt_dirs = [x.split(os.path.sep)[-2] for x in sfile_saved_img_dirs if x is not None]
-    if len(np.unique(expt_dirs)) == 1:
-        base = [x for x in sfile_saved_img_dirs if x is not None][0].split(os.path.sep)[:-2]
-        base = os.path.sep.join(base)
-        expt_dir = expt_dirs[0]
-        sfile_saved_img_dirs = [os.path.join(base, expt_dir, x) for x in sfile_basenames]
-     
-    # HACK: data_dicts appear to include a mistake where stim indices are 
-    # off by some offset; correct here:
-    for s in sfiles:
-        curr_rows = trial_params_df.scenefile == s
-        trial_params_df.loc[curr_rows, 'stim_idx'] = trial_params_df.loc[curr_rows, 'stim_idx'] - min(trial_params_df.loc[curr_rows, 'stim_idx'])
-    
-    # Create dataframe of unique images, add image directories:
-    unique_images_df = trial_params_df[['scenefile', 'stim_idx']].drop_duplicates()
-    tmp = pd.DataFrame(columns=['scenefile', 'sfile_imdir'])
-    tmp['scenefile'] = sfiles
-    tmp['sfile_imdir'] = sfile_saved_img_dirs
-    unique_images_df = pd.merge(unique_images_df, tmp, on=['scenefile'], how='outer')
-    #print('sfile_saved_img_dirs={}'.format(np.array(sfile_saved_img_dirs)))
-    
-    # Get full paths to saved images, add to dataframe:
-    impaths = unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
-    unique_images_df['img_full_path'] = impaths
+            # Find experiment directories for novel scene
+            novel_img_dirs = [x for x in sfile_saved_img_dirs if x is not None and ('UVW' in x or 'XYZ' in x)]
+            novel_exp_dirs = []
+            for n in novel_img_dirs:
+                novel_exp_dirs.append(n.split(os.path.sep)[-2])
+            
+            # If all novel scenefiles are from the same experiment:
+            if len(np.unique(novel_exp_dirs)) == 1:
+                novel_exp_dir = novel_exp_dirs[0]
+                
+                for i, s in enumerate(sfile_saved_img_dirs):
+                    if s is not None and 'ABC' in s:
+                        sfile_parts = s.split(os.path.sep)
+                        sfile_parts[-2] = novel_exp_dir 
+                        new_sfile = os.path.sep.join(sfile_parts)
+                        sfile_saved_img_dirs[i] = new_sfile
+        
+        # HACK: If any scenefiles are missing an experiment directory, and if all 
+        # other scenefiles are in the same known experiment directory, then just 
+        # assume all scenefiles are in that same known experiment directory; in a
+        # worst case scenario, the search will fail at the call to stim_idx_2_img_path
+        # below and return None.
+        expt_dirs = [x.split(os.path.sep)[-2] for x in sfile_saved_img_dirs if x is not None]
+        if len(np.unique(expt_dirs)) == 1:
+            base = [x for x in sfile_saved_img_dirs if x is not None][0].split(os.path.sep)[:-2]
+            base = os.path.sep.join(base)
+            expt_dir = expt_dirs[0]
+            sfile_saved_img_dirs = [os.path.join(base, expt_dir, x) for x in sfile_basenames]
+         
+        # HACK: data_dicts appear to include a mistake where stim indices are 
+        # off by some offset; correct here:
+        for s in sfiles:
+            curr_rows = curr_date_trial_params.scenefile == s
+            curr_date_trial_params.loc[curr_rows, 'stim_idx'] = curr_date_trial_params.loc[curr_rows, 'stim_idx'] - min(curr_date_trial_params.loc[curr_rows, 'stim_idx'])
+        
+        # Create dataframe of unique images, add image directories:
+        curr_unique_images_df = curr_date_trial_params[['scenefile', 'stim_idx']].drop_duplicates()
+        tmp = pd.DataFrame(columns=['scenefile', 'sfile_imdir'])
+        tmp['scenefile'] = sfiles
+        tmp['sfile_imdir'] = sfile_saved_img_dirs
+        curr_unique_images_df = pd.merge(curr_unique_images_df, tmp, on=['scenefile'], how='outer')
+        #print('sfile_saved_img_dirs={}'.format(np.array(sfile_saved_img_dirs)))
+        
+        # Get full paths to saved images, add to dataframe:
+        impaths = curr_unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
+        curr_unique_images_df['img_full_path'] = impaths
+        curr_unique_images_df['date'] = date
+        unique_images_df = pd.concat([unique_images_df, curr_unique_images_df], axis=0)
     
     # Merge unique images with full paths to trial_params_df:
-    trial_params_df = pd.merge(trial_params_df, unique_images_df, on=['scenefile', 'stim_idx'], how='outer')    
+    trial_params_df = pd.merge(trial_params_df, unique_images_df[['date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
+           on=['date', 'scenefile', 'stim_idx'], how='outer')    
 
     return trial_params_df
 
