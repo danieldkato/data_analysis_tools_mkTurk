@@ -774,7 +774,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     
     # Merge unique images with full paths to trial_params_df:
     trial_params_df = pd.merge(trial_params_df, unique_images_df[['date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
-           on=['date', 'scenefile', 'stim_idx'], how='outer')    
+           on=['date', 'scenefile', 'stim_idx'], how='left')    
 
     return trial_params_df
 
