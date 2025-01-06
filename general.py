@@ -366,7 +366,7 @@ def rolling_std(x, window):
 def time_window2bin_indices(plot_window, psth_bins):
     
     if plot_window[0] < np.min(psth_bins):
-        raise AssertionError('Requested plot window extends before first available sample in input data.')
+        raise AssertionError('Requested plot window {} extends before first available sample {} in input data.'.format(plot_window, psth_bins[0]))
     if plot_window[1] > np.max(psth_bins):        
         raise AssertionError('Requested plot window extends after last available sample in input data.')
     
