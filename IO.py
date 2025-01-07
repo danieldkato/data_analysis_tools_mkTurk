@@ -886,31 +886,45 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
         stim_set_str = re.search(scene_regex, scenefile_name).group()
         stim_set = int(stim_set_str[12:])
             
-        # If stim set is less than 5
-        if stim_set < 5:
-
-            expt_dirname = 'Saved_Images_{}_{}'.format(monkey, stim_set_str)
-            # POSSIBLY IMPORTANT? For stim_set = 4, this will automatically 
-            # default to Saved_Images_West_neural_stim_4 rather than 
-            # Saved_Images_West_neural_stim_4_1ABC2DEF_RSVP44; don't know how
-            # differentiate between which of these is appropriate based just on
-            # scenefile name; does it matter?
+        if monkey == 'West':
             
-        # If stim set is greater than or equal to 5, try to additionally get experiment ID:
-        elif stim_set >= 5:
-            
-            expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
-            expt_search = re.search(expt_regex, scenefile_name)
-            if expt_search is not None:
-                expt_str = expt_search.group()[-2:]
-            else:
-                raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
-            
-            # Define experiment directory:
-            expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
-            
-        expt_directory = os.path.join(monkey_dir, expt_dirname)
+            # If stim set is less than 5
+            if stim_set < 5:
     
+                expt_dirname = 'Saved_Images_{}_{}'.format(monkey, stim_set_str)
+                # POSSIBLY IMPORTANT? For stim_set = 4, this will automatically 
+                # default to Saved_Images_West_neural_stim_4 rather than 
+                # Saved_Images_West_neural_stim_4_1ABC2DEF_RSVP44; don't know how
+                # differentiate between which of these is appropriate based just on
+                # scenefile name; does it matter?
+                
+            # If stim set is greater than or equal to 5, try to additionally get experiment ID:
+            elif stim_set >= 5:
+                
+                expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
+                expt_search = re.search(expt_regex, scenefile_name)
+                if expt_search is not None:
+                    expt_str = expt_search.group()[-2:]
+                else:
+                    raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                
+                # Define experiment directory:
+                expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
+
+            expt_directory = os.path.join(monkey_dir, expt_dirname)
+        
+        elif monkey == 'Bourgeois':
+            
+            all_saved_img_dirs = [x[0] for x in os.walk(monkey_dir) if os.path.isdir(x[0])]
+            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+'$', x) is not None]
+            if len(matches_sfile_basename) == 1:
+                expt_directory = matches_sfile_basename[0]
+            elif len(matches_sfile_basename) == 0:
+                warnings.warn('No directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
+                return None
+            elif len(matches_sfile_basename) > 1: 
+                warnings.warn('More than one directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
+                return None
     
     ####
     # Else if dealing with natural image stimuli:
