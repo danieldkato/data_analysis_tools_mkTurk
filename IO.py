@@ -136,6 +136,14 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     extra_params_df = extra_params_df.set_index('idx')
     trial_params_df = pd.concat([extra_params_df, trial_params_df], axis=1)
     
+    # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
+    # m images, then index of first image of scenefile b will be m, not 0:
+    offsets_df = trial_params_df[['scenefile', 'stim_idx']].groupby('scenefile').min().reset_index()
+    offsets_df = offsets_df.rename(columns={'stim_idx':'offset'})
+    trial_params_df = pd.merge(trial_params_df, offsets_df, on=['scenefile'])
+    trial_params_df['stim_idx'] = trial_params_df['stim_idx'] - trial_params_df['offset']
+    trial_params_df['stim_idx'] = trial_params_df['stim_idx'].drop(columns='offset')
+    
     # Try to get paths to saved images:
     trial_params_df = find_im_full_paths(trial_params_df, base_data_path)
         
