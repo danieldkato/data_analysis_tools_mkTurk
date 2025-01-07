@@ -878,16 +878,17 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
     sfile_basename = scenefile_name.split('/')[-1][:-5]
     
     ####
-    # If dealing with scene stimuli:
+
     scene_regex = 'neural_stim_\d+'
-    if re.search(scene_regex, scenefile_name) is not None:
+    if monkey == 'West':
         
-        # Get stim set number:
-        stim_set_str = re.search(scene_regex, scenefile_name).group()
-        stim_set = int(stim_set_str[12:])
+        # If dealing with scene stimuli:        
+        if re.search(scene_regex, scenefile_name) is not None:
             
-        if monkey == 'West':
-            
+            # Get stim set number:
+            stim_set_str = re.search(scene_regex, scenefile_name).group()
+            stim_set = int(stim_set_str[12:])
+                                
             # If stim set is less than 5
             if stim_set < 5:
     
@@ -912,87 +913,95 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
 
             expt_directory = os.path.join(monkey_dir, expt_dirname)
-        
-        elif monkey == 'Bourgeois':
+
+        ####
+        # Else if dealing with natural image stimuli:
+        elif 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name:
             
-            all_saved_img_dirs = [x[0] for x in os.walk(monkey_dir) if os.path.isdir(x[0])]
+            # Look for experiment directories containing 'Rust' and 'NaturalImages'
+            matches = [x for x in monkey_dir_contents if 'Rust' in x and 'NaturalImages' in x]
+            if len(matches) == 1:
+                expt_dirname = matches[0]
+                expt_directory = os.path.join(monkey_dir, expt_dirname)
+            elif len(matches) < 1:
+                raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+            elif len(matches) > 1:
+                raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+        
+            # Random exception handling:
+            if monkey == 'West':
+                expt_directory = os.path.join(expt_directory, 'Save_Images_West_RustDiCarlo')
+        
+            
+        ####
+        # Else if dealing with face stimuli:
+        elif 'elias' in scenefile_name or 'neptune' in scenefile_name:
+            
+            face_expt_dirs = [x for x in monkey_dir_contents if 'Elias' in x and 'Neptune' in x]
+            if len(face_expt_dirs) == 1:
+                expt_dirname = face_expt_dirs[0]
+            elif len(face_expt_dirs) < 1:
+                raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+            elif len(face_expt_dirs) > 1:
+                raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+        
+            expt_directory = os.path.join(monkey_dir, expt_dirname)    
+            
+            # Random exception handling:
+            if monkey == 'West':
+                expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
+           
+            
+        ###
+        # Otherwise, raise warning and return None
+        else:
+            warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
+            return None
+        
+        # Find directory in expt_directory with same name as scenefile basename:
+        if not os.path.exists(expt_directory):
+            warnings.warn('Experiment directory for scenefile {} not found in saved image folder {}; returning None.'.format(scenefile_name, expt_directory))
+            return None
+        expt_dir_contents = os.listdir(expt_directory)
+        if sfile_basename in expt_dir_contents:
+            img_dir = os.path.join(expt_directory, sfile_basename)
+        else:
+            
+            #HACK: If scenefile folder not found in experiment directory, check E6 folder instead:
+            e6_dir = os.path.join(monkey_dir, 'Saved_Images_{}_neural_stim_{}_E6'.format(monkey, stim_set))
+            
+            if os.path.exists(e6_dir):
+                e6_contents = os.listdir(e6_dir)
+                if sfile_basename in e6_contents:
+                    img_dir = os.path.join(e6_dir, sfile_basename)
+                else:
+                    warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
+                    return None
+            else:
+                warnings.warn('Scenefile directory for {} not found; returning None.'.format(sfile_basename))
+                img_dir = None
+        
+    elif monkey == 'Bourgeois':
+            
+        all_saved_img_dirs = [x[0] for x in os.walk(monkey_dir) if os.path.isdir(x[0])]
+        
+        # If dealing with scene stimuli:        
+        if re.search(scene_regex, scenefile_name) is not None:
             matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+'$', x) is not None]
             if len(matches_sfile_basename) == 1:
-                expt_directory = matches_sfile_basename[0]
+                img_dir = matches_sfile_basename[0]
             elif len(matches_sfile_basename) == 0:
                 warnings.warn('No directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
-                return None
+                img_dir = None
             elif len(matches_sfile_basename) > 1: 
                 warnings.warn('More than one directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
-                return None
-    
-    ####
-    # Else if dealing with natural image stimuli:
-    elif 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name:
+                img_dir = None
         
-        # Look for experiment directories containing 'Rust' and 'NaturalImages'
-        matches = [x for x in monkey_dir_contents if 'Rust' in x and 'NaturalImages' in x]
-        if len(matches) == 1:
-            expt_dirname = matches[0]
-            expt_directory = os.path.join(monkey_dir, expt_dirname)
-        elif len(matches) < 1:
-            raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
-        elif len(matches) > 1:
-            raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
-    
-        # Random exception handling:
-        if monkey == 'West':
-            expt_directory = os.path.join(expt_directory, 'Save_Images_West_RustDiCarlo')
-    
-    
-    ####
-    # Else if dealing with face stimuli:
-    elif 'elias' in scenefile_name or 'neptune' in scenefile_name:
-        
-        face_expt_dirs = [x for x in monkey_dir_contents if 'Elias' in x and 'Neptune' in x]
-        if len(face_expt_dirs) == 1:
-            expt_dirname = face_expt_dirs[0]
-        elif len(face_expt_dirs) < 1:
-            raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
-        elif len(face_expt_dirs) > 1:
-            raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
-    
-        expt_directory = os.path.join(monkey_dir, expt_dirname)    
-        
-        # Random exception handling:
-        if monkey == 'West':
-            expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
-       
-        
-    ###
-    # Otherwise, raise warning and return None
-    else:
-        warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
-        return None
-    
-    # Find directory in expt_directory with same name as scenefile basename:
-    if not os.path.exists(expt_directory):
-        warnings.warn('Experiment directory for scenefile {} not found in saved image folder {}; returning None.'.format(scenefile_name, expt_directory))
-        return None
-    expt_dir_contents = os.listdir(expt_directory)
-    if sfile_basename in expt_dir_contents:
-        img_dir = os.path.join(expt_directory, sfile_basename)
-    else:
-        
-        #HACK: If scenefile folder not found in experiment directory, check E6 folder instead:
-        e6_dir = os.path.join(monkey_dir, 'Saved_Images_{}_neural_stim_{}_E6'.format(monkey, stim_set))
-        
-        if os.path.exists(e6_dir):
-            e6_contents = os.listdir(e6_dir)
-            if sfile_basename in e6_contents:
-                img_dir = os.path.join(e6_dir, sfile_basename)
-            else:
-                warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
-                return None
+        # Otherwise, raise warning and return None
         else:
-            warnings.warn('Scenefile directory for {} not found; returning None.'.format(sfile_basename))
+            warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
             img_dir = None
-            
+    
     return img_dir
 
 
