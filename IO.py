@@ -715,17 +715,19 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     if 'img_full_path' in trial_params_df.columns:
         trial_params_df = trial_params_df.drop(columns=['img_full_path'])
     
-    # Iterate over dates:
+    # Iterate over monkeys, dates:
     unique_images_df = pd.DataFrame()
-    dates = np.unique(trial_params_df.date)
-    for date in dates:
+    sessions = trial_params_df[['monkey', 'date']].drop_duplicates()
+    for r, row in sessions.iterrows():
     
+        monkey = row['monkey']
+        date = row['date']
         curr_date_trial_params = trial_params_df[trial_params_df.date==date]
         
         # Try to find saved image directories for all scenefiles:    
         sfiles = np.unique(curr_date_trial_params.scenefile)
         sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
-        sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
+        sfile_saved_img_dirs = [scenefile_2_img_dir(x, monkey, local_data_path) for x in sfiles]
         
         # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
         # those inside experiment directory for UVW, XYZ:
@@ -777,12 +779,13 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         # Get full paths to saved images, add to dataframe:
         impaths = curr_unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
         curr_unique_images_df['img_full_path'] = impaths
+        curr_unique_images_df['monkey'] = monkey
         curr_unique_images_df['date'] = date
         unique_images_df = pd.concat([unique_images_df, curr_unique_images_df], axis=0)
     
     # Merge unique images with full paths to trial_params_df:
-    trial_params_df = pd.merge(trial_params_df, unique_images_df[['date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
-           on=['date', 'scenefile', 'stim_idx'], how='left')    
+    trial_params_df = pd.merge(trial_params_df, unique_images_df[['monkey', 'date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
+           on=['monkey', 'date', 'scenefile', 'stim_idx'], how='left')    
 
     return trial_params_df
 
@@ -844,7 +847,7 @@ def find_saved_imgs_dir(trial_params):
 
 
 
-def scenefile_2_img_dir(scenefile_name, local_base=None):
+def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
     """
     Find saved image directory for input scenefile.
 
@@ -866,7 +869,8 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     
     # Get monkey name:
     sfile_parts = scenefile_name.split('/')
-    monkey = sfile_parts[3]
+    if monkey is None:
+        monkey = sfile_parts[3]
     monkey_dir = os.path.join(base, monkey, 'Saved_Images')
     monkey_dir_contents = os.listdir(monkey_dir)
     
