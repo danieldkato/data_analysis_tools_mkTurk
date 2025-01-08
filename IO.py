@@ -704,6 +704,13 @@ def standardize_col_types(df):
             else: 
                 df.loc[df[col]=='', col] = np.nan # Convert any empty strings to nan
                 df[col] = df[col].astype(float)
+        
+        # If all non-NaNs are arrays:
+        if np.all(df[~df[col].isna()][col].apply(lambda x : type(x)==np.ndarray)):
+            
+            # If all arrays are singleton:
+            if np.all(df[~df[col].isna()][col].apply(lambda x : len(x)==1)):
+                df[col] = df.apply(lambda x : x[col][0] if type(x[col])==np.ndarray else x[col], axis=1)
                 
     return df
 
