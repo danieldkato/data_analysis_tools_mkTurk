@@ -807,10 +807,6 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         
         # Get full paths to saved images, add to dataframe:
         impaths = curr_unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
-        print('monkey={}'.format(monkey))
-        print('date={}'.format(date))
-        print('type(impaths)={}'.format(type(impaths)))
-        print('curr_unique_images_df.shape={}'.format(curr_unique_images_df.shape))
         curr_unique_images_df['img_full_path'] = impaths
         curr_unique_images_df['date'] = date
         unique_images_df = pd.concat([unique_images_df, curr_unique_images_df], axis=0)
