@@ -124,52 +124,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_params_df['idx_merge'] = np.arange(n_rows)
     trial_params_df = trial_params_df.set_index('idx_merge')
     
-    # Try to retrieve THREEJS params directly from behavior files:
-    behav_df = pd.DataFrame()
-    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if date in x]
-    if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
-        sess_dir = os.path.join(base_data_path, monkey, sess_dirs[0])
-        behav_files = np.unique(trial_params_df.behav_file)
-
-        # Iterate over behavior files:
-        for b in behav_files:
-            bpath = os.path.join(sess_dir, b+'.json')
-            bfile = json.load(open(bpath, 'rb'))
-            curr_scenefiles = bfile['TASK']['ImageBagsSample']
-            
-            # Iterate over scenefiles:
-            for s, sfile in enumerate(curr_scenefiles):
-                curr_sfile_df = pd.DataFrame()
-                n_stim = bfile['SCENES']['SampleScenes'][s]['nimages']
-                curr_sfile_df['stim_idx'] = np.arange(n_stim)
-                dims = ['x', 'y', 'z']
-                for dim in dims:
-                    dat =  bfile['SCENES']['SampleScenes'][s]['CAMERAS']['camera00']['targetTHREEJS'][dim]
-                    if len(dat) == n_stim:
-                        curr_sfile_df['targetTHREEJS_'+dim] = dat
-                    elif len(dat) == 1:
-                        curr_sfile_df['targetTHREEJS_'+dim] = dat[0]*np.ones(n_stim)
-                    else:
-                        curr_sfile_df['targetTHREEJS_'+dim] = [None]*n_stim
-                curr_sfile_df['scenefile'] = sfile
-                curr_sfile_df['behav_file'] = b
-                behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
-    trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
-                
-    # Add a few general parameters to trial_params_df:
-    # TODO: think about adding following parameters as well:
-    # From stim_meta (one value per dict): iti_dur, t_before, t_after 
-    # From sess_meta: reward, reward_dur
-    monkey_col = [monkey] * n_rows 
-    date_col = [date] * n_rows
-    reward_bool = sess_meta_df['reward_bool']
-    extra_params_df = pd.DataFrame({'monkey' : monkey_col, 
-                                    'date' : date_col, 
-                                    'reward_bool' : reward_bool})
-    extra_params_df['idx'] = np.arange(n_rows) # < Only need this temporarily to concatenate dataframes
-    extra_params_df = extra_params_df.set_index('idx')
-    trial_params_df = pd.concat([extra_params_df, trial_params_df], axis=1)
-    
     # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
     # m images, then index of first image of scenefile b will be m, not 0:
     offsets_df = trial_params_df[['scenefile', 'stim_idx']].groupby('scenefile').min().reset_index()
@@ -208,19 +162,16 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 curr_sfile_df['scenefile'] = sfile
                 curr_sfile_df['behav_file'] = b
                 behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
-    trial_params_df['dummy'] = 1
-    trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='outer')
-    trial_params_df = trial_params_df[~trial_params_df.dummy.isna()]
-    trial_params_df = trial_params_df.drop(columns=['dummy'])     
+    trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
     trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)       
-    
+                
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
     # From stim_meta (one value per dict): iti_dur, t_before, t_after 
     # From sess_meta: reward, reward_dur
-    trial_params_df['monkey'] = monkey    
+    trial_params_df['monkey'] = monkey
     trial_params_df['date'] = date
-    trial_params_df['reward_bool'] = sess_meta_df['reward_bool']
+    trial_params_df['reward_bool'] = sess_meta_df.reward_bool
     
     # Try to get paths to saved images:
     trial_params_df = find_im_full_paths(trial_params_df, base_data_path)
