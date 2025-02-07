@@ -4,6 +4,7 @@ import time
 import pathlib as Path
 import h5py
 import pickle
+import json
 import warnings
 import re
 import numpy as np
@@ -100,7 +101,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     if preprocessed_data_path is None:
         preprocessed_data_path = get_recording_path(base_data_path, monkey, date, depth=4)[0]
     
-    # Load metadata for current session:
+    # Load metadata for current session
     recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split(os.sep)[-1]
     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
     sess_meta_df = sess_meta_dict_2_df(sess_meta)
@@ -108,7 +109,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     data_dict_path = os.path.join(preprocessed_data_path, 'data_dict_' + recording_dir)
     data_dicts = pickle.load(open(data_dict_path, 'rb'))
     D = [data_dicts[x] for x in np.arange(len(data_dicts))]
-    
+        
     # Find widest range of PSTH bins (these can differ between stimulus 
     # within a session conditions)
     n_bins_per_stim = [stim_meta[x]['n_bins'] for x in stim_ids]
@@ -122,6 +123,52 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     n_rows = trial_params_df.shape[0]
     trial_params_df['idx_merge'] = np.arange(n_rows)
     trial_params_df = trial_params_df.set_index('idx_merge')
+    
+    # Try to retrieve THREEJS params directly from behavior files:
+    behav_df = pd.DataFrame()
+    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if date in x]
+    if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
+        sess_dir = os.path.join(base_data_path, monkey, sess_dirs[0])
+        behav_files = np.unique(trial_params_df.behav_file)
+
+        # Iterate over behavior files:
+        for b in behav_files:
+            bpath = os.path.join(sess_dir, b+'.json')
+            bfile = json.load(open(bpath, 'rb'))
+            curr_scenefiles = bfile['TASK']['ImageBagsSample']
+            
+            # Iterate over scenefiles:
+            for s, sfile in enumerate(curr_scenefiles):
+                curr_sfile_df = pd.DataFrame()
+                n_stim = bfile['SCENES']['SampleScenes'][s]['nimages']
+                curr_sfile_df['stim_idx'] = np.arange(n_stim)
+                dims = ['x', 'y', 'z']
+                for dim in dims:
+                    dat =  bfile['SCENES']['SampleScenes'][s]['CAMERAS']['camera00']['targetTHREEJS'][dim]
+                    if len(dat) == n_stim:
+                        curr_sfile_df['targetTHREEJS_'+dim] = dat
+                    elif len(dat) == 1:
+                        curr_sfile_df['targetTHREEJS_'+dim] = dat[0]*np.ones(n_stim)
+                    else:
+                        curr_sfile_df['targetTHREEJS_'+dim] = [None]*n_stim
+                curr_sfile_df['scenefile'] = sfile
+                curr_sfile_df['behav_file'] = b
+                behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
+    trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
+                
+    # Add a few general parameters to trial_params_df:
+    # TODO: think about adding following parameters as well:
+    # From stim_meta (one value per dict): iti_dur, t_before, t_after 
+    # From sess_meta: reward, reward_dur
+    monkey_col = [monkey] * n_rows 
+    date_col = [date] * n_rows
+    reward_bool = sess_meta_df['reward_bool']
+    extra_params_df = pd.DataFrame({'monkey' : monkey_col, 
+                                    'date' : date_col, 
+                                    'reward_bool' : reward_bool})
+    extra_params_df['idx'] = np.arange(n_rows) # < Only need this temporarily to concatenate dataframes
+    extra_params_df = extra_params_df.set_index('idx')
+    trial_params_df = pd.concat([extra_params_df, trial_params_df], axis=1)
     
     # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
     # m images, then index of first image of scenefile b will be m, not 0:
@@ -735,6 +782,13 @@ def standardize_col_types(df):
             else: 
                 df.loc[df[col]=='', col] = np.nan # Convert any empty strings to nan
                 df[col] = df[col].astype(float)
+        
+        # If all non-NaNs are arrays:
+        if np.all(df[~df[col].isna()][col].apply(lambda x : type(x)==np.ndarray)):
+            
+            # If all arrays are singleton:
+            if np.all(df[~df[col].isna()][col].apply(lambda x : len(x)==1)):
+                df[col] = df.apply(lambda x : x[col][0] if type(x[col])==np.ndarray else x[col], axis=1)
                 
     return df
 
@@ -746,17 +800,19 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
     if 'img_full_path' in trial_params_df.columns:
         trial_params_df = trial_params_df.drop(columns=['img_full_path'])
     
-    # Iterate over dates:
+    # Iterate over monkeys, dates:
     unique_images_df = pd.DataFrame()
-    dates = np.unique(trial_params_df.date)
-    for date in dates:
+    sessions = trial_params_df[['monkey', 'date']].drop_duplicates()
+    for r, row in sessions.iterrows():
     
+        monkey = row['monkey']
+        date = row['date']
         curr_date_trial_params = trial_params_df[trial_params_df.date==date]
         
         # Try to find saved image directories for all scenefiles:    
         sfiles = np.unique(curr_date_trial_params.scenefile)
         sfile_basenames = [x.split('/')[-1][:-5] for x in sfiles] 
-        sfile_saved_img_dirs = [scenefile_2_img_dir(x, local_data_path) for x in sfiles]
+        sfile_saved_img_dirs = [scenefile_2_img_dir(x, monkey, local_data_path) for x in sfiles]
         
         # HACK: if sfiles includes ABC scenefiles, change the saved image directories to 
         # those inside experiment directory for UVW, XYZ:
@@ -808,12 +864,13 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
         # Get full paths to saved images, add to dataframe:
         impaths = curr_unique_images_df.apply(lambda x : stim_idx_2_img_path(x.sfile_imdir, x.stim_idx), axis=1)
         curr_unique_images_df['img_full_path'] = impaths
+        curr_unique_images_df['monkey'] = monkey
         curr_unique_images_df['date'] = date
         unique_images_df = pd.concat([unique_images_df, curr_unique_images_df], axis=0)
     
     # Merge unique images with full paths to trial_params_df:
-    trial_params_df = pd.merge(trial_params_df, unique_images_df[['date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
-           on=['date', 'scenefile', 'stim_idx'], how='left')    
+    trial_params_df = pd.merge(trial_params_df, unique_images_df[['monkey', 'date', 'scenefile', 'stim_idx', 'img_full_path']].drop_duplicates(), 
+           on=['monkey', 'date', 'scenefile', 'stim_idx'], how='left')    
 
     return trial_params_df
 
@@ -875,7 +932,7 @@ def find_saved_imgs_dir(trial_params):
 
 
 
-def scenefile_2_img_dir(scenefile_name, local_base=None):
+def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
     """
     Find saved image directory for input scenefile.
 
@@ -897,7 +954,8 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     
     # Get monkey name:
     sfile_parts = scenefile_name.split('/')
-    monkey = sfile_parts[3]
+    if monkey is None:
+        monkey = sfile_parts[3]
     monkey_dir = os.path.join(base, monkey, 'Saved_Images')
     monkey_dir_contents = os.listdir(monkey_dir)
     
@@ -905,107 +963,142 @@ def scenefile_2_img_dir(scenefile_name, local_base=None):
     sfile_basename = scenefile_name.split('/')[-1][:-5]
     
     ####
-    # If dealing with scene stimuli:
-    scene_regex = 'neural_stim_\d+'
-    if re.search(scene_regex, scenefile_name) is not None:
-        
-        # Get stim set number:
-        stim_set_str = re.search(scene_regex, scenefile_name).group()
-        stim_set = int(stim_set_str[12:])
-            
-        # If stim set is less than 5
-        if stim_set < 5:
 
-            expt_dirname = 'Saved_Images_{}_{}'.format(monkey, stim_set_str)
-            # POSSIBLY IMPORTANT? For stim_set = 4, this will automatically 
-            # default to Saved_Images_West_neural_stim_4 rather than 
-            # Saved_Images_West_neural_stim_4_1ABC2DEF_RSVP44; don't know how
-            # differentiate between which of these is appropriate based just on
-            # scenefile name; does it matter?
+    scene_regex = 'neural_stim_\d+'
+    if monkey == 'West':
+        
+        is_scene = re.search(scene_regex, scenefile_name) is not None
+        is_natural_images = 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name
+        is_faces = 'elias' in scenefile_name or 'neptune' in scenefile_name
+        is_hvm = re.search('hvm\d{2}_\w+_\d{2}_\d{8}', sfile_basename) is not None
+        
+        if is_scene or is_natural_images or is_faces:
+        
+            # If dealing with scene stimuli:        
+            if is_scene is not None:
+                
+                # Get stim set number:
+                stim_set_str = re.search(scene_regex, scenefile_name).group()
+                stim_set = int(stim_set_str[12:])
+                                    
+                # If stim set is less than 5
+                if stim_set < 5:
+        
+                    expt_dirname = 'Saved_Images_{}_{}'.format(monkey, stim_set_str)
+                    # POSSIBLY IMPORTANT? For stim_set = 4, this will automatically 
+                    # default to Saved_Images_West_neural_stim_4 rather than 
+                    # Saved_Images_West_neural_stim_4_1ABC2DEF_RSVP44; don't know how
+                    # differentiate between which of these is appropriate based just on
+                    # scenefile name; does it matter?
+                    
+                # If stim set is greater than or equal to 5, try to additionally get experiment ID:
+                elif stim_set >= 5:
+                    
+                    expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
+                    expt_search = re.search(expt_regex, scenefile_name)
+                    if expt_search is not None:
+                        expt_str = expt_search.group()[-2:]
+                    else:
+                        raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                    
+                    # Define experiment directory:
+                    expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
+    
+                expt_directory = os.path.join(monkey_dir, expt_dirname)
+    
+            ####
+            # Else if dealing with natural image stimuli:
+            elif is_natural_images:
+                
+                # Look for experiment directories containing 'Rust' and 'NaturalImages'
+                matches = [x for x in monkey_dir_contents if 'Rust' in x and 'NaturalImages' in x]
+                if len(matches) == 1:
+                    expt_dirname = matches[0]
+                    expt_directory = os.path.join(monkey_dir, expt_dirname)
+                elif len(matches) < 1:
+                    raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                elif len(matches) > 1:
+                    raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
             
-        # If stim set is greater than or equal to 5, try to additionally get experiment ID:
-        elif stim_set >= 5:
+                # Random exception handling:
+                if monkey == 'West':
+                    expt_directory = os.path.join(expt_directory, 'Save_Images_West_RustDiCarlo')
             
-            expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
-            expt_search = re.search(expt_regex, scenefile_name)
-            if expt_search is not None:
-                expt_str = expt_search.group()[-2:]
-            else:
-                raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                
+            ####
+            # Else if dealing with face stimuli:
+            elif is_faces:
+                
+                face_expt_dirs = [x for x in monkey_dir_contents if 'Elias' in x and 'Neptune' in x]
+                if len(face_expt_dirs) == 1:
+                    expt_dirname = face_expt_dirs[0]
+                elif len(face_expt_dirs) < 1:
+                    raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+                elif len(face_expt_dirs) > 1:
+                    raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
             
-            # Define experiment directory:
-            expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
-            
-        expt_directory = os.path.join(monkey_dir, expt_dirname)
-    
-    
-    ####
-    # Else if dealing with natural image stimuli:
-    elif 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name:
-        
-        # Look for experiment directories containing 'Rust' and 'NaturalImages'
-        matches = [x for x in monkey_dir_contents if 'Rust' in x and 'NaturalImages' in x]
-        if len(matches) == 1:
-            expt_dirname = matches[0]
-            expt_directory = os.path.join(monkey_dir, expt_dirname)
-        elif len(matches) < 1:
-            raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
-        elif len(matches) > 1:
-            raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
-    
-        # Random exception handling:
-        if monkey == 'West':
-            expt_directory = os.path.join(expt_directory, 'Save_Images_West_RustDiCarlo')
-    
-    
-    ####
-    # Else if dealing with face stimuli:
-    elif 'elias' in scenefile_name or 'neptune' in scenefile_name:
-        
-        face_expt_dirs = [x for x in monkey_dir_contents if 'Elias' in x and 'Neptune' in x]
-        if len(face_expt_dirs) == 1:
-            expt_dirname = face_expt_dirs[0]
-        elif len(face_expt_dirs) < 1:
-            raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
-        elif len(face_expt_dirs) > 1:
-            raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
-    
-        expt_directory = os.path.join(monkey_dir, expt_dirname)    
-        
-        # Random exception handling:
-        if monkey == 'West':
-            expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
-       
-        
-    ###
-    # Otherwise, raise warning and return None
-    else:
-        warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
-        return None
-    
-    # Find directory in expt_directory with same name as scenefile basename:
-    if not os.path.exists(expt_directory):
-        warnings.warn('Experiment directory for scenefile {} not found in saved image folder {}; returning None.'.format(scenefile_name, expt_directory))
-        return None
-    expt_dir_contents = os.listdir(expt_directory)
-    if sfile_basename in expt_dir_contents:
-        img_dir = os.path.join(expt_directory, sfile_basename)
-    else:
-        
-        #HACK: If scenefile folder not found in experiment directory, check E6 folder instead:
-        e6_dir = os.path.join(monkey_dir, 'Saved_Images_{}_neural_stim_{}_E6'.format(monkey, stim_set))
-        
-        if os.path.exists(e6_dir):
-            e6_contents = os.listdir(e6_dir)
-            if sfile_basename in e6_contents:
-                img_dir = os.path.join(e6_dir, sfile_basename)
-            else:
-                warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
+                expt_directory = os.path.join(monkey_dir, expt_dirname)    
+                
+                # Random exception handling:
+                if monkey == 'West':
+                    expt_directory = os.path.join(expt_directory, 'Save_Images_West_EliasNeptune')        
+
+            # Find directory in expt_directory with same name as scenefile basename:
+            if not os.path.exists(expt_directory):
+                warnings.warn('Experiment directory for scenefile {} not found in saved image folder {}; returning None.'.format(scenefile_name, expt_directory))
                 return None
+            expt_dir_contents = os.listdir(expt_directory)
+            if sfile_basename in expt_dir_contents:
+                img_dir = os.path.join(expt_directory, sfile_basename)
+            else:
+                
+                #HACK: If scenefile folder not found in experiment directory, check E6 folder instead:
+                e6_dir = os.path.join(monkey_dir, 'Saved_Images_{}_neural_stim_{}_E6'.format(monkey, stim_set))
+                
+                if os.path.exists(e6_dir):
+                    e6_contents = os.listdir(e6_dir)
+                    if sfile_basename in e6_contents:
+                        img_dir = os.path.join(e6_dir, sfile_basename)
+                    else:
+                        warnings.warn('Scenefile directory for {} not found in {}; returning None.'.format(sfile_basename, expt_directory))
+                        return None
+                else:
+                    warnings.warn('Scenefile directory for {} not found; returning None.'.format(sfile_basename))
+                    img_dir = None
+
+        ####
+        # Else if dealing with HvM stimuli:
+        elif is_hvm:            
+            img_dir = os.path.join(monkey_dir, 'hvm10', sfile_basename)
+        
+        ###
+        # Otherwise, raise warning and return None
         else:
-            warnings.warn('Scenefile directory for {} not found; returning None.'.format(sfile_basename))
-            img_dir = None
+            warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
+            return None
+        
+        
+    elif monkey == 'Bourgeois':
             
+        all_saved_img_dirs = [x[0] for x in os.walk(monkey_dir) if os.path.isdir(x[0])]
+        
+        # If dealing with scene stimuli:        
+        if re.search(scene_regex, scenefile_name) is not None:
+            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+'$', x) is not None]
+            if len(matches_sfile_basename) == 1:
+                img_dir = matches_sfile_basename[0]
+            elif len(matches_sfile_basename) == 0:
+                warnings.warn('No directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
+                img_dir = None
+            elif len(matches_sfile_basename) > 1: 
+                warnings.warn('More than one directory matching pattern {} discovered in {}; setting saved image directory to None.'.format(sfile_basename, monkey_dir))
+                img_dir = None
+        
+        # Otherwise, raise warning and return None
+        else:
+            warnings.warn('Input scenefile {} does not match any specified pattern.'.format(scenefile_name))
+            img_dir = None
+    
     return img_dir
 
 
