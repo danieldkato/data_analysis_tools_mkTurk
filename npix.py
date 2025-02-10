@@ -144,15 +144,15 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=20, ti
     spacing = spacing/1000 # convert to mm
     
     # Get 0-coordinates:
-    ap0, dv0, ml0, angle, depth  = get_coords_sess(base_data_path, monkey, date)
-    depth_adjusted = (depth - tip_length)/1000 # Adjust for probe tip length
+    zero_coords = get_coords_sess(base_data_path, monkey, date)
+    depth_adjusted = (zero_coords.depth - tip_length)/1000 # Adjust for probe tip length
     
     # Compute unit vector pointing in direction of probe in ML-DV plane: 
-    angleh = 90 - angle # Convert to relative to horizontal
+    angleh = 90 - zero_coords.Ang # Convert to relative to horizontal
     angler = 2*np.pi * angleh/360  # Convert degrees to radians
     m = np.arctan(angler) # Get slope
     bhat = np.array([0, -m, -1])/np.linalg.norm([0,-m,-1]) # Unit vector in ML-DV plane pointing in direction of probe
-    distal_coords = [ap0, dv0, ml0] + bhat * depth_adjusted 
+    distal_coords = [zero_coords.AP, zero_coords.DV, zero_coords.ML] + bhat * depth_adjusted 
     
     # Get IMRO table:
     glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
