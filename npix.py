@@ -129,7 +129,7 @@ def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, 
 
     
 
-def get_site_coords(base_data_path, monkey, date, config='short', spacing=20, tip_length=175):
+def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
 
