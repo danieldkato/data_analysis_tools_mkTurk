@@ -103,29 +103,44 @@ def get_coords_sess(base_data_path, monkey, date):
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
 
-    str_vec = Path.Path(data_path).name.split('_')
-    hemisphere = str_vec[2]
-    hole_id = int(str_vec[3].split('H')[1])
-    pen_id = int(str_vec[4].split('P')[1])
-    ap_coord = float(str_vec[5].split('AP')[1])
-    dv_coord = float(str_vec[6].split('DV')[1])
-    ml_coord = float(str_vec[7].split('ML')[1])
-    ang = float(str_vec[8].split('Ang')[1])
+    name = Path.Path(data_path).name
     
-    # Position of depth within str_vec is variable due to changes in naming 
-    # convention over time; automatically find Depth tag using reegex; maybe
-    # should eventually do this for all other variables too?
-    depth_inds = np.where([re.search('Dep',x) is not None for x in str_vec])[0]
-    if len(depth_inds) == 1:
-        depth_ind = depth_inds[0]
-    elif len(depth_inds) < 1:
-        raise ValueError('No depth specified in data path.')
-    elif len(depth_inds) > 1:
-        raise ValueError('More than one depth specified in data path.')
-    depth_start = int(str_vec[depth_ind].split('Dep')[1].split('-')[0])
-    depth_end = str_vec[depth_ind].split('Dep')[1].split('-')[1]
+    # Define field names and corresponding search patterns:
+    fnames = np.array(['hole_id', 'penetration', 'AP', 'DV', 'ML', 'Ang', 'HAng']) 
+    patterns = ['_H\d+\.*\d*_', '_P\d+\.*\d*_', 'AP\d+\.*\d*', 'DV\d+\.*\d*', 
+                'ML\d+\.*\d*', '[^H]Ang\d+\.*\d', 'HAng\d+\.*\d*']
+    regex_lut = pd.DataFrame({'regex':patterns}, index=fnames)
+    
+    # Iterate over numeric fields (except depth):
+    zero_coord_series = pd.Series()
+    for idx, row in regex_lut.iterrows():
+        matches = re.findall(row.regex, name)
+        if len(matches) == 1:
+            val = float(re.search('\d+\.*\d*', matches[0]).group())
+        else:
+            val = None
+        zero_coord_series[idx] = val
 
-    return ap_coord, dv_coord, ml_coord, ang, depth_start
+    # Find depth (requires separate treatment from other numeric parameters bc
+    # filenames include both starting and stop depth):
+    depth_regex = 'Dep\d+-\d+'
+    depth_matches = re.findall(depth_regex, name)
+    if len(depth_matches) == 1:
+        depth_vals = re.findall('\d+', depth_matches[0])
+        depth = float(depth_vals[1])
+    else:
+        depth = None
+    zero_coord_series['depth'] = depth
+        
+    # Find brain hemisphere:
+    hemisphere_str = re.findall('_(L|R)_', name)
+    if len(hemisphere_str) == 1:
+        hemisphere = re.search('(L|R)', hemisphere_str[0]).group()
+    else:
+        hemisphere = None
+    zero_coord_series['hemisphere'] = hemisphere
+
+    return zero_coord_series
 
 def gen_meta_behavior(base_data_path, monkey):
     folders = os_sorted(Path.Path(base_data_path, monkey).glob(monkey + '*'))
