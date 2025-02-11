@@ -148,11 +148,30 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     depth_adjusted = (zero_coords.depth - tip_length)/1000 # Adjust for probe tip length
     
     # Compute unit vector pointing in direction of probe in ML-DV plane: 
-    angleh = 90 - zero_coords.Ang # Convert to relative to horizontal
-    angler = 2*np.pi * angleh/360  # Convert degrees to radians
-    m = np.arctan(angler) # Get slope
-    bhat = np.array([0, -m, -1])/np.linalg.norm([0,-m,-1]) # Unit vector in ML-DV plane pointing in direction of probe
-    distal_coords = [zero_coords.AP, zero_coords.DV, zero_coords.ML] + bhat * depth_adjusted 
+    ehat = np.expand_dims(np.array([0,-1,0]), axis=1) # AP, ML, DV
+    
+    # Convert degrees to radians, angle rel. horiz.        
+    angle_vert =  90 - zero_coords.Ang # Convert to relative to horizontal
+    angle_vert = 2*np.pi * angle_vert/360  # Convert degrees to radians
+    angle_horiz = 2*np.pi * zero_coords.HAng/360 # Convert degrees to radians
+    
+    # Define rotation in ML-DV plane
+    Rvert = [[1,0,0],
+         [0, np.cos(angle_vert), -np.sin(angle_vert)],
+         [0, np.sin(angle_vert), np.cos(angle_vert)]]
+    
+    # Define rotation in AP-ML plane
+    Rhoriz = [[np.cos(angle_horiz),-np.sin(angle_horiz),0],
+     [np.sin(angle_horiz), np.cos(angle_horiz), 0],
+    [0, 0, 1]]
+
+    # Apply rotations:    
+    bhat = np.matmul(Rhoriz, ehat)
+    bhat = np.matmul(Rvert, ehat) # Unit vector pointing in direction of probe
+    
+    # Apply scale and offset:
+    offset = np.expand_dims(np.array([zero_coords.AP, zero_coords.ML, zero_coords.DV]), axis=1)
+    distal_coords =  offset + bhat * depth_adjusted 
     
     # Get IMRO table:
     glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
@@ -172,9 +191,9 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     Distances = bank_length*Banks + spacing*Chs # < Array of recording site distances from (adjusted) tip
 
     # Compute 3D coordinates of each recoding site:
-    B = repmat(bhat, n_chans, 1)
+    B = repmat(bhat.T, n_chans, 1)
     D = np.transpose(repmat(Distances, 3, 1))
-    F = repmat(distal_coords, n_chans, 1)
+    F = repmat(distal_coords.T, n_chans, 1)
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
