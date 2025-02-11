@@ -23,7 +23,7 @@ except ImportError:
 
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None, 
-    chunk_size=100, dtype=float, save_output=False, output_directory=None):
+    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None):
     """
     Combine pickled dicts of single-channel PSTHs into single HDF5. 
 
@@ -256,7 +256,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         if not os.path.exists(output_directory):
             Path.Path(output_directory).mkdir(parents=True, exist_ok=True)
             
-        output_path = os.path.join(output_directory, 'all_psth.h5'.format(monkey, date)) 
+        output_path = os.path.join(output_directory, fname+'.h5') 
         
         print('Saving HDF5 to disk...')
         with h5py.File(output_path, 'w') as f:
