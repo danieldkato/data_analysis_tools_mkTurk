@@ -187,8 +187,8 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     Banks = np.array([x[1] for x in imro_tbl[1:]])
     
     # Compute distance of each recording site from (adjusted) tip:
-    bank_length = n_chans*spacing 
-    Distances = bank_length*Banks + spacing*Chs # < Array of recording site distances from (adjusted) tip
+    bank_length = n_chans/2*spacing 
+    Distances = bank_length*Banks + spacing*(Chs - Chs % 2)# < Array of recording site distances from (adjusted) tip
 
     # Compute 3D coordinates of each recoding site:
     B = repmat(bhat.T, n_chans, 1)
