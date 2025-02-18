@@ -180,11 +180,11 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     imro_tbl = extract_imro_table(glx_meta_path)
     
     # Get number of channels:
-    n_chans = imro_tbl[0][1]
-    Chs = np.arange(n_chans)  
+    n_chans = imro_tbl.shape[0]
+    Chs = np.array(imro_tbl.index)  
     
     # Get bank assignments for each channel:
-    Banks = np.array([x[1] for x in imro_tbl[1:]])
+    Banks = imro_tbl.bank
     
     # Compute distance of each recording site from (adjusted) tip:
     bank_length = n_chans/2*spacing 
