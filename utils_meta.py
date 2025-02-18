@@ -106,17 +106,21 @@ def get_coords_sess(base_data_path, monkey, date):
     name = Path.Path(data_path).name
     
     # Define field names and corresponding search patterns:
-    fnames = np.array(['hole_id', 'penetration', 'AP', 'DV', 'ML', 'Ang', 'HAng']) 
-    patterns = ['_H\d+\.*\d*_', '_P\d+\.*\d*_', 'AP\d+\.*\d*', 'DV\d+\.*\d*', 
-                'ML\d+\.*\d*', '[^H]Ang\d+\.*\d', 'HAng\d+\.*\d*']
-    regex_lut = pd.DataFrame({'regex':patterns}, index=fnames)
+    patterns = {'hole_id' : '_H\d+\.*\d*_', 
+                'penetration' : '_P\d+\.*\d*_', 
+                'AP' : 'AP-{0,1}\d+\.*\d*', 
+                'DV' : 'DV-{0,1}\d+\.*\d*', 
+                'ML' : 'ML-{0,1}\d+\.*\d*', 
+                'Ang'  : '[^H]Ang\d+\.*\d', 
+                'HAng' : 'HAng\d+\.*\d*'}
+    regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
     zero_coord_series = pd.Series()
     for idx, row in regex_lut.iterrows():
         matches = re.findall(row.regex, name)
         if len(matches) == 1:
-            val = float(re.search('\d+\.*\d*', matches[0]).group())
+            val = float(re.search('-{0,1}\d+\.*\d*', matches[0]).group())
         else:
             val = None
         zero_coord_series[idx] = val
