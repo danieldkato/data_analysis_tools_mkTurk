@@ -269,7 +269,18 @@ def extract_imro_table(metadata_path):
         curr_tuple = tuple(nums)
         tuples.append(curr_tuple)
         
-    return tuples
+    # Convert list of tuples to dataframe:
+    imro_tbl = pd.DataFrame()
+    if tuples[0][0] == 0:
+        fields = ['channel', 'bank', 'ref_id', 'ap_gain', 'lf_gain', 'ap_hipass']
+        
+    for i, field in enumerate(fields):
+        imro_tbl[field] = [x[i] for x in tuples[1:]]
+        
+    imro_tbl.index = imro_tbl.channel
+    imro_tbl = imro_tbl.drop(columns=['channel'])
+        
+    return imro_tbl
 
 
 
