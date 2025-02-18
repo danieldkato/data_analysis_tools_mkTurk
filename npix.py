@@ -145,6 +145,8 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     
     # Get 0-coordinates:
     zero_coords = get_coords_sess(base_data_path, monkey, date)
+    if np.isnan(zero_coords.HAng):
+        zero_coords.HAng = 0
     depth_adjusted = (zero_coords.depth - tip_length)/1000 # Adjust for probe tip length
     
     # Compute unit vector pointing in direction of probe in ML-DV plane: 
