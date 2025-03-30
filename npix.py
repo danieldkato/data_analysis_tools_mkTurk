@@ -356,7 +356,7 @@ def get_session_chs(date, region=None):
 
 
 
-def session_2_chs(monkey, date):
+def session_2_chs(monkey, date=None, area=None):
     
     # Ultra-hacky; map dates to good channel ranges; find a better way of dealing
     # with this in the future:
@@ -554,13 +554,30 @@ def session_2_chs(monkey, date):
         }
     
     if monkey not in ch_lookup.keys():
+        warnings.warn('Lookup table for requested monkey {} not found.'.format(monkey))
         output = None
     else:
         monkey_dict = ch_lookup[monkey]
-        if date not in monkey_dict.keys():
-            output = None
+        
+        # Return channels for specific session if requested:
+        if date is None:
+            output = monkey_dict
         else:
-            output = monkey_dict[date] 
+            if date not in monkey_dict.keys():
+                warnings.warn('Lookup table for requested session {}, {} not found.'.format(monkey, date))
+                output = None
+            else:
+                date_dict = monkey_dict[date] 
+                
+                # Return channels for specific area if requested:
+                if area is not None:
+                    output = date_dict
+                else:
+                    if area not in date_dict.keys():
+                        warnings.warn('Channel range for session {}, {}, area {} not found.'.format(monkey, date, area))
+                        output = None
+                    else:
+                        output = date_dict[area]
     
     return output
 
