@@ -366,150 +366,150 @@ def session_2_chs(monkey, date=None, area=None):
         'West' : {
             
             '20230914' : {
-                'IT': [280, 383],
-                'WM' : [0, 279],
+                'IT': np.arange(280, 383),
+                'WM' : np.arange(0, 279),
                 'HC' : None,
                 'PH' : None
                 },
             
             '20231011' : {
                 'IT': None,
-                'WM' : [0, 299],
+                'WM' : np.arange(0, 299),
                 'HC' : None,
-                'PH' : [300, 384]
+                'PH' : np.arange(300, 384)
                 },
 
             '20231102' : {
-                'IT': [160, 383],
+                'IT': np.arange(160, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : [0, 159]
+                'PH' : np.arange(0, 159)
                 },
             
             '20231109' : {
                 'IT': None,
-                'WM' : [250, 383],
+                'WM' : np.arange(250, 383),
                 'HC' : None,
-                'PH' : [0, 249]
+                'PH' : np.arange(0, 249)
                 },        
 
             '20231207' : {
-                'IT': [75, 384],
+                'IT': np.arange(75, 384),
                 'WM' : None,
                 'HC' : None,
-                'PH' : [0, 74]
+                'PH' : np.arange(0, 74)
                 },                
 
             '20231211' : {
-                'IT': [185, 383],
+                'IT': np.arange(185, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : [0, 184]
+                'PH' : np.arange(0, 184)
                 },                 
 
             '20240110' : {
-                'IT': [285, 383],
-                'WM' : [220, 285],
-                'HC' : [0, 220],
+                'IT': np.arange(285, 383),
+                'WM' : np.arange(220, 285),
+                'HC' : np.arange(0, 220),
                 'PH' : None
                 },            
 
             '20240116' : {
-                'IT': [295, 383],
-                'WM' : [120, 199],
-                'HC' : [120, 240],
-                'PH' : [0, 70]
+                'IT': np.arange(295, 383),
+                'WM' : np.arange(120, 199),
+                'HC' : np.arange(120, 240),
+                'PH' : np.arange(0, 70)
                 },                    
             
             '20240123' : {
-                'IT': [345, 383],
-                'WM' : [185, 314],
-                'HC' : [110, 314],
-                'PH' : [0, 70]
+                'IT': np.arange(345, 383),
+                'WM' : np.arange(185, 314),
+                'HC' : np.arange(110, 314),
+                'PH' : np.arange(0, 70)
                 },           
             
             '20240124' : {
-                'IT': [250, 384],
-                'WM' : [200, 250],
-                'HC' : [75, 200],
-                'PH' : [0, 35]
+                'IT': np.arange(250, 384),
+                'WM' : np.arange(200, 250),
+                'HC' : np.arange(75, 200),
+                'PH' : np.arange(0, 35)
                 },           
             
             '20240130' : {
-                'IT': [250, 383],
-                'WM' : [40, 164],
-                'HC' : [75, 210],
-                'PH' : [0, 50]
+                'IT': np.arange(250, 383),
+                'WM' : np.arange(40, 164),
+                'HC' : np.arange(75, 210),
+                'PH' : np.arange(0, 50)
                 },                    
 
             '20240124' : {
-                'IT': [250, 383],
-                'WM' : [0, 159],
-                'HC' : [75, 200],
-                'PH' : [0, 35]
+                'IT': np.arange(250, 383),
+                'WM' : np.arange(0, 159),
+                'HC' : np.arange(75, 200),
+                'PH' : np.arange(0, 35)
                 },            
 
             '20240202' : {
-                'IT': [22, 348],
-                'WM' : [190, 220],
-                'HC' : [80, 190],
+                'IT': np.arange(22, 348),
+                'WM' : np.arange(190, 220),
+                'HC' : np.arange(80, 190),
                 'PH' : None
                 },    
 
             '20240207' : {
-                'IT': [280, 383],
-                'WM' : [230, 260],
-                'HC' : [129, 235],
-                'PH' : [0, 119]
+                'IT': np.arange(280, 383),
+                'WM' : np.arange(230, 260),
+                'HC' : np.arange(129, 235),
+                'PH' : np.arange(0, 119)
                 },           
 
             '20240208' : {
-                'IT': [265, 384],
-                'WM' : [75, 199],
-                'HC' : [130, 230],
-                'PH' : [0, 129]
+                'IT': np.arange(265, 384),
+                'WM' : np.arange(75, 199),
+                'HC' : np.arange(130, 230),
+                'PH' : np.arange(0, 129)
                 }, 
 
             '20240307' : {
-                'IT': [250, 330],
-                'WM' : [0, 70],
+                'IT': np.arange(250, 330),
+                'WM' : np.arange(0, 70),
                 'HC' : None,
-                'PH' : [70, 250]
+                'PH' : np.arange(70, 250)
                 }, 
 
             '20240408' : {
-                'IT': [285, 350],
-                'WM' : [180, 285],
-                'HC' : [0, 180],
+                'IT': np.arange(285, 350),
+                'WM' : np.arange(180, 285),
+                'HC' : np.arange(0, 180),
                 'PH' : None
                 }, 
 
             '20240409' : {
-                'IT': [320, 383],
-                'WM' : [290, 320],
-                'HC' : [0, 290],
+                'IT': np.arange(320, 383),
+                'WM' : np.arange(290, 320),
+                'HC' : np.arange(0, 290),
                 'PH' : None
                 }, 
 
             '20240410' : {
-                'IT': [285, 330],
-                'WM' : [230, 285],
+                'IT': np.arange(285, 330),
+                'WM' : np.arange(230, 285),
                 'HC' : None,
-                'PH' : [0, 60]
+                'PH' : np.arange(0, 60)
                 }, 
 
             '20240412' : {
-                'IT': [240, 270],
-                'WM' : [150, 240],
+                'IT': np.arange(240, 270),
+                'WM' : np.arange(150, 240),
                 'HC' : None,
-                'PH' : [0, 150]
+                'PH' : np.arange(0, 150)
                 }, 
 
             '20240417' : {
-                'IT': [275, 300],
-                'WM' : [195, 275],
+                'IT': np.arange(275, 300),
+                'WM' : np.arange(195, 275),
                 'HC' : None,
-                'PH' : [0, 190]
+                'PH' : np.arange(0, 190)
                 },         
             
             '20240418' : {
@@ -520,29 +520,29 @@ def session_2_chs(monkey, date=None, area=None):
                 },     
             
             '20240607' : {
-                'IT': [220, 360],
-                'WM' : [190, 220],
-                'HC' : [65, 190],
-                'PH' : [0, 65]
+                'IT': np.arange(220, 360),
+                'WM' : np.arange(190, 220),
+                'HC' : np.arange(65, 190),
+                'PH' : np.arange(0, 65)
                 },     
 
             '20240718' : {
-                'IT': [190, 383],
+                'IT': np.arange(190, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : [0, 190]
+                'PH' : np.arange(0, 190)
                 },     
 
             '20240812' : {
-                'IT': [260, 383],
-                'WM' : [180, 260],
+                'IT': np.arange(260, 383),
+                'WM' : np.arange(180, 260),
                 'HC' : None,
-                'PH' : [135, 180]
+                'PH' : np.arange(135, 180)
                 },     
             
             '20240816' : {
-                'IT': [175, 320],
-                'WM' : [14, 175],
+                'IT': np.arange(175, 320),
+                'WM' : np.arange(14, 175),
                 'HC' : None,
                 'PH' : None
                 }
