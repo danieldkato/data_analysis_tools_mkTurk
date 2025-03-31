@@ -570,7 +570,7 @@ def session_2_chs(monkey, date=None, area=None):
                 date_dict = monkey_dict[date] 
                 
                 # Return channels for specific area if requested:
-                if area is not None:
+                if area is None:
                     output = date_dict
                 else:
                     if area not in date_dict.keys():
