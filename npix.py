@@ -548,7 +548,27 @@ def session_2_chs(monkey, date=None, area=None):
                 }
             },
         
-        'Bourgeois' : {}
+        'Bourgeois' : {
+
+            '20250103' : {
+                'IT' : np.arange(0, 263)
+                },
+            
+            '20250106' : {
+                'IT' : np.arange(0, 254)
+                },
+
+            '20250107' : {
+                'IT' : np.arange(231, 299),
+                'MT' : np.arange(0, 168),                
+                },
+            
+            '20250110' : {
+                'IT' : np.arange(184, 310), 
+                'MT' : np.arange(0, 152) 
+                }
+            
+            }
         
         
         }
