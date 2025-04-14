@@ -356,11 +356,38 @@ def get_session_chs(date, region=None):
 
 
 
+def add_chs_by_area(df_in):
+    
+    # Assign some defaults:
+    if 'area' not in df_in.columns:
+        df_in['area'] = 'all'
+    
+    # Iterate over sessions x areas:
+    df_out = pd.DataFrame()
+    areas = df_in[['monkey', 'date', 'area']].drop_duplicates()
+    for aidx, area in areas.iterrows():
+        monkey = area.monkey
+        date = area.date
+        area = area.area
+        curr_chs = session_2_chs(monkey, date, area)
+        if curr_chs is None:
+            curr_chs = []
+        curr_chs_df = pd.DataFrame(columns=['monkey', 'date', 'area', 'ch_idx'], index=np.arange(len(curr_chs)))
+        curr_chs_df['monkey'] = monkey
+        curr_chs_df['date'] = date
+        curr_chs_df['area'] = area
+        curr_chs_df['ch_idx'] = curr_chs
+        df_out = pd.concat([df_out, curr_chs_df], axis=0)
+            
+    return df_out
+
+
+
 def session_2_chs(monkey, date=None, area=None):
     
     # Ultra-hacky; map dates to good channel ranges; find a better way of dealing
     # with this in the future:
-                
+    
     ch_lookup = {
         
         'West' : {
@@ -369,203 +396,233 @@ def session_2_chs(monkey, date=None, area=None):
                 'IT': np.arange(280, 383),
                 'WM' : np.arange(0, 279),
                 'HC' : None,
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 },
             
             '20231011' : {
                 'IT': None,
                 'WM' : np.arange(0, 299),
                 'HC' : None,
-                'PH' : np.arange(300, 384)
+                'PH' : np.arange(300, 384),
+                'all' : np.arange(384)
                 },
 
             '20231102' : {
                 'IT': np.arange(160, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : np.arange(0, 159)
+                'PH' : np.arange(0, 159),
+                'all' : np.arange(384)
                 },
             
             '20231109' : {
                 'IT': None,
                 'WM' : np.arange(250, 383),
                 'HC' : None,
-                'PH' : np.arange(0, 249)
+                'PH' : np.arange(0, 249),
+                'all' : np.arange(384)
                 },        
 
             '20231207' : {
                 'IT': np.arange(75, 384),
                 'WM' : None,
                 'HC' : None,
-                'PH' : np.arange(0, 74)
+                'PH' : np.arange(0, 74),
+                'all' : np.arange(384)
                 },                
 
             '20231211' : {
                 'IT': np.arange(185, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : np.arange(0, 184)
+                'PH' : np.arange(0, 184),
+                'all' : np.arange(384)
                 },                 
 
             '20240110' : {
                 'IT': np.arange(285, 383),
                 'WM' : np.arange(220, 285),
                 'HC' : np.arange(0, 220),
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 },            
 
             '20240116' : {
                 'IT': np.arange(295, 383),
                 'WM' : np.arange(120, 199),
                 'HC' : np.arange(120, 240),
-                'PH' : np.arange(0, 70)
+                'PH' : np.arange(0, 70),
+                'all' : np.arange(384)
                 },                    
             
             '20240123' : {
                 'IT': np.arange(345, 383),
                 'WM' : np.arange(185, 314),
                 'HC' : np.arange(110, 314),
-                'PH' : np.arange(0, 70)
+                'PH' : np.arange(0, 70),
+                'all' : np.arange(384)
                 },           
             
             '20240124' : {
                 'IT': np.arange(250, 384),
                 'WM' : np.arange(200, 250),
                 'HC' : np.arange(75, 200),
-                'PH' : np.arange(0, 35)
+                'PH' : np.arange(0, 35),
+                'all' : np.arange(384)
                 },           
             
             '20240130' : {
                 'IT': np.arange(250, 383),
                 'WM' : np.arange(40, 164),
                 'HC' : np.arange(75, 210),
-                'PH' : np.arange(0, 50)
+                'PH' : np.arange(0, 50),
+                'all' : np.arange(384)
                 },                    
 
             '20240124' : {
                 'IT': np.arange(250, 383),
                 'WM' : np.arange(0, 159),
                 'HC' : np.arange(75, 200),
-                'PH' : np.arange(0, 35)
+                'PH' : np.arange(0, 35),
+                'all' : np.arange(384)
                 },            
 
             '20240202' : {
                 'IT': np.arange(22, 348),
                 'WM' : np.arange(190, 220),
                 'HC' : np.arange(80, 190),
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 },    
 
             '20240207' : {
                 'IT': np.arange(280, 383),
                 'WM' : np.arange(230, 260),
                 'HC' : np.arange(129, 235),
-                'PH' : np.arange(0, 119)
+                'PH' : np.arange(0, 119),
+                'all' : np.arange(384)
                 },           
 
             '20240208' : {
                 'IT': np.arange(265, 384),
                 'WM' : np.arange(75, 199),
                 'HC' : np.arange(130, 230),
-                'PH' : np.arange(0, 129)
+                'PH' : np.arange(0, 129),
+                'all' : np.arange(384)
                 }, 
 
             '20240307' : {
                 'IT': np.arange(250, 330),
                 'WM' : np.arange(0, 70),
                 'HC' : None,
-                'PH' : np.arange(70, 250)
+                'PH' : np.arange(70, 250),
+                'all' : np.arange(384)
                 }, 
 
             '20240408' : {
                 'IT': np.arange(285, 350),
                 'WM' : np.arange(180, 285),
                 'HC' : np.arange(0, 180),
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 }, 
 
             '20240409' : {
                 'IT': np.arange(320, 383),
                 'WM' : np.arange(290, 320),
                 'HC' : np.arange(0, 290),
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 }, 
 
             '20240410' : {
                 'IT': np.arange(285, 330),
                 'WM' : np.arange(230, 285),
                 'HC' : None,
-                'PH' : np.arange(0, 60)
+                'PH' : np.arange(0, 60),
+                'all' : np.arange(384)
                 }, 
 
             '20240412' : {
                 'IT': np.arange(240, 270),
                 'WM' : np.arange(150, 240),
                 'HC' : None,
-                'PH' : np.arange(0, 150)
+                'PH' : np.arange(0, 150),
+                'all' : np.arange(384)
                 }, 
 
             '20240417' : {
                 'IT': np.arange(275, 300),
                 'WM' : np.arange(195, 275),
                 'HC' : None,
-                'PH' : np.arange(0, 190)
+                'PH' : np.arange(0, 190),
+                'all' : np.arange(384)
                 },         
             
             '20240418' : {
                 'IT': None,
                 'WM' : None,
                 'HC' : None,
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 },     
             
             '20240607' : {
                 'IT': np.arange(220, 360),
                 'WM' : np.arange(190, 220),
                 'HC' : np.arange(65, 190),
-                'PH' : np.arange(0, 65)
+                'PH' : np.arange(0, 65),
+                'all' : np.arange(384)
                 },     
 
             '20240718' : {
                 'IT': np.arange(190, 383),
                 'WM' : None,
                 'HC' : None,
-                'PH' : np.arange(0, 190)
+                'PH' : np.arange(0, 190),
+                'all' : np.arange(384)
                 },     
 
             '20240812' : {
                 'IT': np.arange(260, 383),
                 'WM' : np.arange(180, 260),
                 'HC' : None,
-                'PH' : np.arange(135, 180)
+                'PH' : np.arange(135, 180),
+                'all' : np.arange(384)
                 },     
             
             '20240816' : {
                 'IT': np.arange(175, 320),
                 'WM' : np.arange(14, 175),
                 'HC' : None,
-                'PH' : None
+                'PH' : None,
+                'all' : np.arange(384)
                 }
             },
         
         'Bourgeois' : {
 
             '20250103' : {
-                'IT' : np.arange(0, 263)
+                'IT' : np.arange(0, 263),
+                'all' : np.arange(384)
                 },
             
             '20250106' : {
-                'IT' : np.arange(0, 254)
+                'IT' : np.arange(0, 254),
+                'all' : np.arange(384)
                 },
 
             '20250107' : {
                 'IT' : np.arange(231, 299),
                 'MT' : np.arange(0, 168),                
+                'all' : np.arange(384)
                 },
             
             '20250110' : {
                 'IT' : np.arange(184, 310), 
-                'MT' : np.arange(0, 152) 
+                'MT' : np.arange(0, 152),
+                'all' : np.arange(384) 
                 }
             
             }
