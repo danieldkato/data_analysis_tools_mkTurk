@@ -748,6 +748,7 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
     R = np.zeros((n_channels, len(classes))) # < Response of each channel to each stim
     
     # Iterate over classes:
+    df = pd.DataFrame()
     for cx, cl in enumerate(classes):
         
         if type(cl) == list:
@@ -787,13 +788,17 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         
     # Test whether each channel significantly deflects above specified number
     # of standard deviations for *any* requested class:    
-    P = np.any(P, axis=1)
+    above_th = np.any(P, axis=1)
     visually_driven = np.where(P)[0]
         
     # Take max response of each channel to any stimulus:
     max_responses = np.max(R, axis=1)
         
-    return visually_driven, max_responses
+    df['ch_idx'] = np.arange(n_channels)
+    df['sig'] = above_th
+    df['max_response'] = max_responses
+    
+    return df
 
 
 
