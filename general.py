@@ -701,104 +701,114 @@ def visual_drive(trial_df, baseline_window, psth_bins=None, sig=1, classes=None,
         stim_id_rows = trial_df.loc[B]
         unique_stim_ids = np.unique(stim_id_rows.stim_id)
         classes = [[x] for x in unique_stim_ids]
-        
-    # Try to find psth_bin edges from input dataframe by default (maybe this should be a function):
-    try: 
-        P = np.array(list(trial_df['psth_bins']))
-        # If all bin edges are the same, use bin edges from first trial:
-        if sum(np.ptp(P,axis=0)) == 0:
-            psth_bins = trial_df.iloc[0].psth_bins
-    # Otherwise try to get bin edges from input param:
-    except KeyError:
-        psth_bins = psth_bins
-    # If still can't find bin edges, raise error:
-    if psth_bins is None:
-        raise AssertionError('Could not find PSTH bin edges.')
-
-    # Compute indices of baseline period:
-    bl_edge_indices = time_window2bin_indices(baseline_window, psth_bins)
-    bl_indices = np.arange(bl_edge_indices[0], bl_edge_indices[1])
-
-    # Extract only rows corresponding to RSVP=0 stimulus presentations:
-    rsvp0_rows = trial_df[trial_df.rsvp_num==0]
-
-    # Baseline-subtract all trials:
-    rsvp0_rows['psth'] = rsvp0_rows.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
-    all_rsvp0_data = df_2_psth_mat(rsvp0_rows)
-
-    # Compute stdev for all channels:
-    #sds = get_ch_stdev(trial_df, baseline_window, psth_bins)
-
-    #"""
     
-    # Extract only pre-trial baseline period data, compute standard dev:
-    all_bline = all_rsvp0_data[:, bl_indices, :] 
-    n_channels = all_bline.shape[0]
-    n_bins = all_bline.shape[1]
-    n_repeats = all_bline.shape[2]
-    all_bline_reshape = np.reshape(all_bline, (n_channels, len(bl_indices)*n_repeats), order='F')
-    sds = np.nanstd(all_bline_reshape, axis=1)     
+    # Iterate over sessions:
+    chs_df = pd.DataFrame()
+    sessions = trial_df[['monkey', 'date']].drop_duplicates()
+    for s, session in sessions.iterrows():    
+        
+        curr_trials = trial_df[np.array(trial_df.monkey==session.monkey) & np.array(trial_df.monkey==session.monkey)]
+        
+        # Try to find psth_bin edges from input dataframe by default (maybe this should be a function):
+        try: 
+            P = np.array(list(curr_trials['psth_bins']))
+            # If all bin edges are the same, use bin edges from first trial:
+            if sum(np.ptp(P,axis=0)) == 0:
+                psth_bins = curr_trials.iloc[0].psth_bins
+        # Otherwise try to get bin edges from input param:
+        except KeyError:
+            psth_bins = psth_bins
+        # If still can't find bin edges, raise error:
+        if psth_bins is None:
+            raise AssertionError('Could not find PSTH bin edges.')
+        
+        # Compute indices of baseline period:
+        bl_edge_indices = time_window2bin_indices(baseline_window, psth_bins)
+        bl_indices = np.arange(bl_edge_indices[0], bl_edge_indices[1])
     
-
-    #"""
+        # Extract only rows corresponding to RSVP=0 stimulus presentations:
+        rsvp0_rows = curr_trials[curr_trials.rsvp_num==0]
     
-    # Initialize arrays 
-    #n_channels = len(sds)
-    P = np.zeros((n_channels, len(classes))) # < Whether each channel is significantly deflected
-    R = np.zeros((n_channels, len(classes))) # < Response of each channel to each stim
+        # Baseline-subtract all trials:
+        rsvp0_rows['psth'] = rsvp0_rows.apply(lambda x : bl_subtract_data(x.psth, baseline_window, psth_bins), axis=1)
+        all_rsvp0_data = df_2_psth_mat(rsvp0_rows)
     
-    # Iterate over classes:
-    df = pd.DataFrame()
-    for cx, cl in enumerate(classes):
-        
-        if type(cl) == list:
-            cl_ar = np.array(cl)
-        elif type(cl) == str:
-            cl_ar = np.array([cl])
-        else:
-            cl_ar = cl
-        
-        curr_class_rows = rsvp0_rows[rsvp0_rows.stim_id.isin(cl_ar)] # c-by-b-by-s 
-        if curr_class_rows.shape[0] == 0: # If there are no RSVP 0 presentations of the current stim, move on to the next one
-            continue
-        
-        # Average over individual presentations:
-        curr_class_data = df_2_psth_mat(curr_class_rows)
-        curr_class_means = np.nanmean(curr_class_data, axis=2) # c-by-b
-        
-        # Smooth mean PSTH:
-        if smooth_window is not None:
-            kernel = np.ones(smooth_window)/smooth_window
-            curr_class_means = np.array([np.convolve(row, kernel, 'same') for row in curr_class_means])
-        
-        # Select only data from after baseline period:
-        curr_class_means = curr_class_means[:, bl_edge_indices[1]:]
-        curr_class_means = np.nanmax(curr_class_means, axis=1)
-        
-        #curr_class_blines = curr_class_means[:, bl_indices]
-        #curr_class_bline_means = np.nanmean(curr_class_blines, axis=1)
-        
-        # Test whether peak of mean is above specified number of standard deviations:
-        sig_deflection = np.abs(curr_class_means) > sig * sds
-        #sig_deflection = np.abs(curr_class_means - curr_class_bline_means) > sig * sds
-        
-        # Update table:
-        P[:, cx] = sig_deflection
-        R[:, cx] = curr_class_means
-        
-    # Test whether each channel significantly deflects above specified number
-    # of standard deviations for *any* requested class:    
-    above_th = np.any(P, axis=1)
-    visually_driven = np.where(P)[0]
-        
-    # Take max response of each channel to any stimulus:
-    max_responses = np.max(R, axis=1)
-        
-    df['ch_idx'] = np.arange(n_channels)
-    df['sig'] = above_th
-    df['max_response'] = max_responses
+        # Compute stdev for all channels:
+        #sds = get_ch_stdev(trial_df, baseline_window, psth_bins)
     
-    return df
+        #"""
+        
+        # Extract only pre-trial baseline period data, compute standard dev:
+        all_bline = all_rsvp0_data[:, bl_indices, :] 
+        n_channels = all_bline.shape[0]
+        n_bins = all_bline.shape[1]
+        n_repeats = all_bline.shape[2]
+        all_bline_reshape = np.reshape(all_bline, (n_channels, len(bl_indices)*n_repeats), order='F')
+        sds = np.nanstd(all_bline_reshape, axis=1)     
+        
+    
+        #"""
+        
+        # Initialize arrays 
+        #n_channels = len(sds)
+        P = np.zeros((n_channels, len(classes))) # < Whether each channel is significantly deflected
+        R = np.zeros((n_channels, len(classes))) # < Response of each channel to each stim
+        
+        # Iterate over classes:
+        curr_df = pd.DataFrame()
+        for cx, cl in enumerate(classes):
+            
+            if type(cl) == list:
+                cl_ar = np.array(cl)
+            elif type(cl) == str:
+                cl_ar = np.array([cl])
+            else:
+                cl_ar = cl
+            
+            curr_class_rows = rsvp0_rows[rsvp0_rows.stim_id.isin(cl_ar)] # c-by-b-by-s 
+            if curr_class_rows.shape[0] == 0: # If there are no RSVP 0 presentations of the current stim, move on to the next one
+                continue
+            
+            # Average over individual presentations:
+            curr_class_data = df_2_psth_mat(curr_class_rows)
+            curr_class_means = np.nanmean(curr_class_data, axis=2) # c-by-b
+            
+            # Smooth mean PSTH:
+            if smooth_window is not None:
+                kernel = np.ones(smooth_window)/smooth_window
+                curr_class_means = np.array([np.convolve(row, kernel, 'same') for row in curr_class_means])
+            
+            # Select only data from after baseline period:
+            curr_class_means = curr_class_means[:, bl_edge_indices[1]:]
+            curr_class_means = np.nanmax(curr_class_means, axis=1)
+            
+            #curr_class_blines = curr_class_means[:, bl_indices]
+            #curr_class_bline_means = np.nanmean(curr_class_blines, axis=1)
+            
+            # Test whether peak of mean is above specified number of standard deviations:
+            sig_deflection = np.abs(curr_class_means) > sig * sds
+            #sig_deflection = np.abs(curr_class_means - curr_class_bline_means) > sig * sds
+            
+            # Update table:
+            P[:, cx] = sig_deflection
+            R[:, cx] = curr_class_means
+            
+        # Test whether each channel significantly deflects above specified number
+        # of standard deviations for *any* requested class:    
+        above_th = np.any(P, axis=1)
+        visually_driven = np.where(P)[0]
+            
+        # Take max response of each channel to any stimulus:
+        max_responses = np.max(R, axis=1)
+            
+        curr_df['monkey'] = session.monkey 
+        curr_df['date'] = session.date
+        curr_df['ch_idx'] = np.arange(n_channels)
+        curr_df['sig'] = above_th
+        curr_df['max_response'] = max_responses
+        chs_df = pd.concat([chs_df, curr_df], axis=0)
+        
+    return chs_df
 
 
 
