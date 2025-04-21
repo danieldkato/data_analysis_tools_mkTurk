@@ -598,6 +598,34 @@ def session_2_chs(monkey, date=None, area=None):
                 'HC' : None,
                 'PH' : None,
                 'all' : np.arange(384)
+                }, 
+            
+            '20240920' : {
+                'all' : np.arange(384)
+                },
+
+            '20240924' : {
+                'all' : np.arange(384)
+                },
+
+            '20240925' : {
+                'all' : np.arange(384)
+                },
+            
+            '20240927' : {
+                'all' : np.arange(384)
+                },
+            
+            '20241004' : {
+                'all' : np.arange(384)
+                },
+            
+            '20241010' : {
+                'all' : np.arange(384)
+                },
+            
+            '20241011' : {
+                'all' : np.arange(384)
                 }
             },
         
