@@ -601,31 +601,66 @@ def session_2_chs(monkey, date=None, area=None):
                 }, 
             
             '20240920' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE0' : np.arange(0,180),
+                'TE3' : np.arange(180, 325),
+                'IT' : np.arange(0, 325)
                 },
 
             '20240924' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE2' : np.arange(106, 161),
+                'TE3' : np.arange(161, 328),
+                'PHC' : np.arange(0, 106),
+                'IT' : np.arange(106, 328),
+                'MT' : np.arange(0,106)
                 },
 
             '20240925' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE2' : np.arange(106, 151),
+                'TE3' : np.arange(151, 328),
+                'PHC' : np.arange(0, 106),
+                'IT' : np.arange(106, 328),
+                'MT' : np.arange(0, 106)
                 },
             
             '20240927' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE2' : np.arange(106, 151),
+                'TE3' : np.arange(151, 304),
+                'PHC' : np.arange(0, 106),
+                'IT' : np.arange(106, 304),
+                'MT' : np.arange(0, 106)
                 },
             
             '20241004' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE3' : np.arange(239, 353),
+                'WM' : np.arange(166, 239),
+                'HC' : np.arange(0, 166),
+                'IT' : np.arange(239, 352),
+                'MT' : np.arange(0, 165)
                 },
             
             '20241010' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE2' : np.arange(131, 215),
+                'TE3' : np.arange(215, 304),
+                'PHC' : np.arange(84, 131),
+                'PRH' : np.arange(0, 84),
+                'IT' : np.arange(131, 304),
+                'MT' : np.arange(0, 131)
                 },
             
             '20241011' : {
-                'all' : np.arange(384)
+                'all' : np.arange(384),
+                'TE2' : np.arange(144, 222),
+                'TE3' : np.arange(222, 324),
+                'PHC' : np.arange(84, 144),
+                'PRH' : np.arange(0, 84),
+                'IT' : np.arange(144, 324),
+                'MT' : np.arange(0, 144)
                 }
             },
         
