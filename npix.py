@@ -686,8 +686,31 @@ def session_2_chs(monkey, date=None, area=None):
                 'IT' : np.arange(184, 310), 
                 'MT' : np.arange(0, 152),
                 'all' : np.arange(384) 
-                }
+                },
             
+            '20250310' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250311' : {
+                'all' : np.arange(384) 
+                },
+
+            '20250328' : {
+                'all' : np.arange(384) 
+                },
+
+            '20250331' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250417' : {
+                'all' : np.arange(384) 
+                },            
+            
+            '20250418' : {
+                'all' : np.arange(384) 
+                }
             }
         
         
