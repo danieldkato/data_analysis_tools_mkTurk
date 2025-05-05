@@ -13,7 +13,7 @@ import json
 from itertools import product
 from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
 from data_analysis_tools_mkTurk.stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
-from data_analysis_tools_mkTurk.npix import get_site_coords
+from data_analysis_tools_mkTurk.npix import get_sess_metadata_path, extract_imro_table, get_site_coords
 from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
@@ -199,7 +199,13 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     scenefile_mat = np.array([[x in scenefile_meta[y]['stim_ids'] for y in scenefiles] for x in stim_ids])
     scenefile_mat = scenefile_mat.T 
    
-    # Get coordinates of different sites:
+    # Get stereotaxic coordinates of zero point (where probe touches surface of brain) for current session:
+    zero_coords = get_coords_sess(base_data_path, monkey, date)
+    glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
+    if 'win' in sys.platform:
+        glx_meta_path = '\\\\?\\' + glx_meta_path
+    imro_tbl = extract_imro_table(glx_meta_path)
+        
     coords_df = get_site_coords(base_data_path, monkey, date, spacing=15, tip_length=175) # < Hard-coded for now
     coords_df = coords_df.sort_values('depth', ascending=False) 
    
@@ -296,6 +302,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             #"""
             
             # Write channel coordinates:
+            zero_coords.to_hdf(output_path, 'zero_coordinates', 'a', format='fixed')
+            imro_tbl.to_hdf(output_path, 'imro_table', 'a', format='fixed')
             coords_df.to_hdf(output_path, 'site_coordinates', 'a', format='fixed')
             
             # Write metadata for session:
