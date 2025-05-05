@@ -377,11 +377,11 @@ def add_chs_by_area(df_in):
         curr_chs = session_2_chs(monkey, date, area)
         if curr_chs is None:
             curr_chs = []
-        curr_chs_df = pd.DataFrame(columns=['monkey', 'date', 'area', 'ch_idx'], index=np.arange(len(curr_chs)))
+        curr_chs_df = pd.DataFrame(columns=['monkey', 'date', 'area', 'ch_idx_depth'], index=np.arange(len(curr_chs)))
         curr_chs_df['monkey'] = monkey
         curr_chs_df['date'] = date
         curr_chs_df['area'] = area
-        curr_chs_df['ch_idx'] = curr_chs
+        curr_chs_df['ch_idx_depth'] = curr_chs
         df_out = pd.concat([df_out, curr_chs_df], axis=0)
             
     return df_out
