@@ -129,7 +129,7 @@ def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, 
 
     
 
-def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, tip_length=175):
+def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
 
@@ -144,7 +144,6 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     spacing = spacing/1000 # convert to mm
     
     # Get 0-coordinates:
-    zero_coords = get_coords_sess(base_data_path, monkey, date)
     if np.isnan(zero_coords.HAng):
         zero_coords.HAng = 0
     depth_adjusted = (zero_coords.depth - tip_length)/1000 # Adjust for probe tip length
@@ -174,12 +173,6 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     # Apply scale and offset:
     offset = np.expand_dims(np.array([zero_coords.AP, zero_coords.ML, zero_coords.DV]), axis=1)
     distal_coords =  offset + bhat * depth_adjusted 
-    
-    # Get IMRO table:
-    glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
-    if 'win' in sys.platform:
-        glx_meta_path = '\\\\?\\' + glx_meta_path
-    imro_tbl = extract_imro_table(glx_meta_path)
     
     # Get number of channels:
     n_chans = imro_tbl.shape[0]
