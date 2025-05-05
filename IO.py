@@ -201,7 +201,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
    
     # Get coordinates of different sites:
     coords_df = get_site_coords(base_data_path, monkey, date, spacing=15, tip_length=175) # < Hard-coded for now
-    coords_df = coords_df.sort_values('depth', ascending=False) # < Assume that channels have already been sorted by depth (lower channel # > deeper, higher channel # > more superficial)
+    coords_df = coords_df.sort_values('depth', ascending=False) 
    
     
     # Initialize data array:
