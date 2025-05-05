@@ -129,6 +129,14 @@ def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, 
 
     
 
+def h5_2_site_coords_df(h5path):
+    zero_coords = pd.read_hdf(h5path, 'zero_coordinates')
+    imro_tbl = pd.read_hdf(h5path, 'imro_table')
+    site_coords_df = get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=1725)
+    return site_coords_df
+
+
+
 def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
