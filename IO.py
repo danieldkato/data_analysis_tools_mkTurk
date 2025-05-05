@@ -206,10 +206,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         glx_meta_path = '\\\\?\\' + glx_meta_path
     imro_tbl = extract_imro_table(glx_meta_path)
         
-    coords_df = get_site_coords(base_data_path, monkey, date, spacing=15, tip_length=175) # < Hard-coded for now
-    coords_df = coords_df.sort_values('depth', ascending=False) 
-   
-    
     # Initialize data array:
     if channels is None:
         channels = find_channels(preprocessed_data_path)
@@ -304,7 +300,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             # Write channel coordinates:
             zero_coords.to_hdf(output_path, 'zero_coordinates', 'a', format='fixed')
             imro_tbl.to_hdf(output_path, 'imro_table', 'a', format='fixed')
-            coords_df.to_hdf(output_path, 'site_coordinates', 'a', format='fixed')
             
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
