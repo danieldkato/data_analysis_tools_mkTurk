@@ -199,8 +199,8 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['channel', 'ap', 'dv', 'ml', 'depth'])
-    coords_df['channel'] = Chs
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'dv', 'ml', 'depth'])
+    coords_df['ch_idx_glx'] = Chs
     coords_df['ap'] = Coords[:,0]
     coords_df['dv'] = Coords[:,1]
     coords_df['ml'] = Coords[:,2]    
@@ -689,19 +689,37 @@ def session_2_chs(monkey, date=None, area=None):
                 },
             
             '20250310' : {
-                'all' : np.arange(384) 
+                'all' : np.arange(384),
+                'unclassified' : np.arange(229, 383),
+                'TE0' : np.arange(0, 229),
+                'IT' : np.arange(0, 229)
                 },
             
             '20250311' : {
-                'all' : np.arange(384) 
+                'all' : np.arange(384),
+                'unclassified' : np.arange(180, 383),
+                'TE0' : np.arange(0, 180),
+                'IT' : np.arange(0, 180)
                 },
 
             '20250328' : {
-                'all' : np.arange(384) 
+                'all' : np.arange(384),
+                'unclassified' : np.arange(293, 384),
+                'TE3' : np.arange(233, 292),
+                'PHC' : np.arange(0, 156),
+                'WM' : np.arange(156, 233),
+                'IT' : np.arange(233, 292),
+                'MT' : np.arange(0, 156)
                 },
 
             '20250331' : {
-                'all' : np.arange(384) 
+                'all' : np.arange(384),
+                'unclassified' : np.arange(300, 384),
+                'TE3' : np.arange(236, 300),
+                'PHC' : np.arange(0, 150),
+                'WM' : np.arange(151, 235),
+                'IT' : np.arange(236, 300),
+                'MT' : np.arange(0, 150)
                 },
             
             '20250417' : {
