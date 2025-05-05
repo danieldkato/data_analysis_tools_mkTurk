@@ -208,7 +208,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     coords_df['depth'] = depth_adjusted - D
     
     # Add channel index by depth:
-    coords_df = coords_df.sort_values(by=['depth', 'ch_idx_glx'], ascending=False)
+    coords_df = coords_df.sort_values(by=['depth', 'ch_idx_glx'], ascending=[False, True])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
     coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
     
