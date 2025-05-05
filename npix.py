@@ -206,6 +206,11 @@ def get_site_coords(base_data_path, monkey, date, config='short', spacing=15, ti
     coords_df['ml'] = Coords[:,2]    
     coords_df['depth'] = depth_adjusted - D
     
+    # Add channel index by depth:
+    coords_df = coords_df.sort_values(by='depth', ascending=False)
+    coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
+    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    
     return coords_df
 
 
