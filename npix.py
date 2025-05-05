@@ -191,7 +191,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     
     # Compute distance of each recording site from (adjusted) tip:
     bank_length = n_chans/2*spacing 
-    Distances = bank_length*Banks + spacing*(Chs - Chs % 2)# < Array of recording site distances from (adjusted) tip
+    Distances = bank_length*Banks + spacing*(Chs - Chs % 2)/2 # < Array of recording site distances from (adjusted) tip
 
     # Compute 3D coordinates of each recoding site:
     B = repmat(bhat.T, n_chans, 1)
