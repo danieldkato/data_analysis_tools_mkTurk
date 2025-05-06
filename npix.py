@@ -136,6 +136,22 @@ def h5_2_ch_meta(h5path):
 
 
 
+def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
+    
+    # Initialize dataframe:
+    chs_df = pd.DataFrame()
+    
+    # Iterate over sessions:
+    for zidx, zero_coords in zero_coords_df.iterrows():
+        
+        curr_imro_tbl = imro_df[np.array(imro_df.monkey == zero_coords.monkey) & np.array(imro_df.date== zero_coords.date)]
+        curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
+        chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
+    
+    return chs_df 
+
+
+
 def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
