@@ -176,7 +176,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
 
     # Apply rotations:    
     bhat = np.matmul(Rhoriz, ehat)
-    bhat = np.matmul(Rvert, ehat) # Unit vector pointing in direction of probe
+    bhat = np.matmul(Rvert, bhat) # Unit vector pointing in direction of probe
     
     # Apply scale and offset:
     offset = np.expand_dims(np.array([zero_coords.AP, zero_coords.ML, zero_coords.DV]), axis=1)
