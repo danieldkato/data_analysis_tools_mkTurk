@@ -146,7 +146,12 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         
         curr_imro_tbl = imro_df[np.array(imro_df.monkey == zero_coords.monkey) & np.array(imro_df.date== zero_coords.date)]
         curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
+        curr_coords_df['monkey'] = zero_coords.monkey
+        curr_coords_df['date'] = zero_coords.date
         chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
+    
+    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
 
