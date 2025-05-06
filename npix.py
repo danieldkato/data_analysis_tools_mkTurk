@@ -145,6 +145,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
     for zidx, zero_coords in zero_coords_df.iterrows():
         
         curr_imro_tbl = imro_df[np.array(imro_df.monkey == zero_coords.monkey) & np.array(imro_df.date== zero_coords.date)]
+        curr_imro_tbl.index = curr_imro_tbl.ch_idx_glx
         curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
         curr_coords_df['monkey'] = zero_coords.monkey
         curr_coords_df['date'] = zero_coords.date
@@ -231,6 +232,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     coords_df = coords_df.sort_values(by=['depth', 'ch_idx_glx'], ascending=[False, True])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
     coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
 
