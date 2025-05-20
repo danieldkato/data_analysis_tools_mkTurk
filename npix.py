@@ -756,6 +756,26 @@ def session_2_chs(monkey, date=None, area=None):
             
             '20250418' : {
                 'all' : np.arange(384) 
+                },
+            
+            '20250506' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250507' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250513' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250514' : {
+                'all' : np.arange(384) 
+                },
+            
+            '20250515' : {
+                'all' : np.arange(384) 
                 }
             }
         
