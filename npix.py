@@ -235,6 +235,10 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
     # Initialize dataframe:
     chs_df = pd.DataFrame()
     
+    # Convert zero_coords from Series to DataFrame if necessary:
+    if type(zero_coords_df) == pd.Series:
+        zero_coords_df = pd.DataFrame(zero_coords_df).T
+    
     # Iterate over sessions:
     for zidx, zero_coords in zero_coords_df.iterrows():
         
