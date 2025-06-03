@@ -137,6 +137,100 @@ def h5_2_ch_meta(h5path):
 
 
 def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
+    """
+    Compute stereotaxic coordinates of all recording sites for a given session.      
+
+    Parameters
+    ----------
+    zero_coords_df : pandas.core.series.Series
+        Pandas Series specifying where probe intersects pial surface of brain, in 
+        stereotaxic coordinates. Should define following keys:
+            
+            monkey : str
+                Monkey name.
+                
+            date : str
+                Recording session date, formatted YYYY-MM-DD. 
+            
+            hole_id : int
+                Craniotomy index. 
+                
+            penetration : int
+                Index of penetration into craniotomy specified in `hole_id`.
+                
+            AP : numeric
+                Anteroposterior coordinate of penetration site, in mm.     
+                
+            DV : numeric
+                Dorsoventral coordinate of penetration site, in mm.
+
+            DV : numeric
+                Mediolateral coordinate of penetration site, in mm.
+                
+            Ang : numeric
+                Vertical angle of probe, in degrees.
+                
+            HAng : numeric
+                Horizontal angle of probe, in degrees.
+                
+            depth : numeric
+                Maximum depth of probe from pial surface, in mm. 
+                
+            hemisphere : 'left' | 'right'
+                Brain hemisphere. 
+        
+    imro_df : pandas.core.frame.DataFrame
+        SpikeGLX IMRO table specifying channel configurations. Each row corresponds
+        to a SpikeGLX channel/contact site on the proble. Should define following 
+        columns:
+
+            monkey : str
+                Monkey name.
+                
+            date : str
+                Recording session date, formatted YYYY-MM-DD. 
+                
+            ch_idx_glx : int
+                SpikeGLX channel index. 
+            
+            bank : int
+                Bank corresponding channel is active on in given recording session.
+                
+    spacing : numeric, optional
+        Spacing between rows of contact sites, in micros. The default is 15.
+        
+    tip_length : numeric, optional
+        Probe tip length, in micros. The default is 175.
+
+    Returns
+    -------
+    chs_df : pandas.core.frame.DataFrame
+        Dataframe of recording site coordinates. Defines the following columns:
+            
+            monkey : str
+                Monkey name.
+                
+            date : str 
+                Recording session date.
+                
+            ch_idx_glx : int
+                SpikeGLX channel index. 
+                
+            ch_idx_depth : int
+                Channel depth-order; numbering starts from most distal channel. 
+                
+            ap  : numpy.float
+                Recording site anteroposterior coordinate, in mm. 
+                
+            dv  : numpy.float
+                Recording site dorsoventral coordinate, in mm.
+            
+            mk  : numpy.float
+                Recording site mediolateral coordinate, in mm.
+                
+            depth : numpy.float
+                Channel depth from pial surface, in mm. 
+    """
     
     # Initialize dataframe:
     chs_df = pd.DataFrame()
