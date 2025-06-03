@@ -928,7 +928,7 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
         if is_scene or is_natural_images or is_faces:
         
             # If dealing with scene stimuli:        
-            if is_scene is not None:
+            if is_scene:
                 
                 # Get stim set number:
                 stim_set_str = re.search(scene_regex, scenefile_name).group()
