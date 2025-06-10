@@ -164,7 +164,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
             DV : numeric
                 Dorsoventral coordinate of penetration site, in mm.
 
-            DV : numeric
+            ML : numeric
                 Mediolateral coordinate of penetration site, in mm.
                 
             Ang : numeric
