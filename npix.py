@@ -320,7 +320,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'])
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
     coords_df['ap'] = Coords[:,0]
     coords_df['ml'] = Coords[:,1]
@@ -328,7 +328,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     coords_df['depth'] = depth_adjusted - D
     
     # Add channel index by depth:
-    coords_df = coords_df.sort_values(by=['depth', 'ch_idx_glx'], ascending=[False, True])
+    coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
     coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
     coords_df.index = np.arange(coords_df.shape[0])
