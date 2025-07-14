@@ -136,7 +136,7 @@ def h5_2_ch_meta(h5path):
 
 
 
-def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
+def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=20, tip_length=175):
     """
     Compute stereotaxic coordinates of all recording sites for a given session.      
 
@@ -242,6 +242,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
     # Iterate over sessions:
     for zidx, zero_coords in zero_coords_df.iterrows():
         
+        print(type(zero_coords))
         curr_imro_tbl = imro_df[np.array(imro_df.monkey == zero_coords.monkey) & np.array(imro_df.date== zero_coords.date)]
         curr_imro_tbl.index = curr_imro_tbl.ch_idx_glx
         curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
@@ -256,7 +257,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
 
 
 
-def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
+def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
 
@@ -319,11 +320,11 @@ def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'dv', 'ml', 'depth'])
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'])
     coords_df['ch_idx_glx'] = Chs
     coords_df['ap'] = Coords[:,0]
-    coords_df['dv'] = Coords[:,1]
-    coords_df['ml'] = Coords[:,2]    
+    coords_df['ml'] = Coords[:,1]
+    coords_df['dv'] = Coords[:,2]    
     coords_df['depth'] = depth_adjusted - D
     
     # Add channel index by depth:
