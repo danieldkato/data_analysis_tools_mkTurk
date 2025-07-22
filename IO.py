@@ -202,9 +202,12 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     # Get stereotaxic coordinates of zero point (where probe touches surface of brain) for current session:
     zero_coords = get_coords_sess(base_data_path, monkey, date)
     glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
-    if 'win' in sys.platform:
-        glx_meta_path = '\\\\?\\' + glx_meta_path
-    imro_tbl = extract_imro_table(glx_meta_path)
+    if glx_meta_path is not None:
+        if 'win' in sys.platform:
+            glx_meta_path = '\\\\?\\' + glx_meta_path
+        imro_tbl = extract_imro_table(glx_meta_path)
+    else:
+        warnings.warn('No .ap.meta file discovered for {} session {}.'.format(monkey, date))
         
     # Initialize data array:
     if channels is None:
