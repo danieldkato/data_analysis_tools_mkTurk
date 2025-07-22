@@ -418,8 +418,12 @@ def get_sess_metadata_path(base_data_path, monkey, date):
     data_path = get_recording_path(base_data_path, monkey, date, depth = 4)[0]
     fnames = os.listdir(data_path)
     metafiles = [x for x in fnames if '.ap.meta' in x]
-    mfile = metafiles[0]
-    session_metadata_path = os.path.join(data_path, mfile)
+    if len(metafiles>0):
+        mfile = metafiles[0]
+        session_metadata_path = os.path.join(data_path, mfile)
+    else:
+        warnings.warn('No .ap.meta file discovered in {}.'.format(data_path))
+        session_metadata_path = None
     return session_metadata_path
 
 
