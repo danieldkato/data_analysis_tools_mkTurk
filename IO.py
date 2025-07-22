@@ -207,6 +207,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             glx_meta_path = '\\\\?\\' + glx_meta_path
         imro_tbl = extract_imro_table(glx_meta_path)
     else:
+        imro_tbl = pd.DataFrame()
         warnings.warn('No .ap.meta file discovered for {} session {}.'.format(monkey, date))
         
     # Initialize data array:
