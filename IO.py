@@ -956,7 +956,8 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                     if expt_search is not None:
                         expt_str = expt_search.group()[-2:]
                     else:
-                        raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        warnings.warn('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        return None
                     
                     # Define experiment directory:
                     expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
@@ -973,9 +974,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                     expt_dirname = matches[0]
                     expt_directory = os.path.join(monkey_dir, expt_dirname)
                 elif len(matches) < 1:
-                    raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
                 elif len(matches) > 1:
-                    raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
             
                 # Random exception handling:
                 if monkey == 'West':
@@ -990,9 +993,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 if len(face_expt_dirs) == 1:
                     expt_dirname = face_expt_dirs[0]
                 elif len(face_expt_dirs) < 1:
-                    raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    warnings.warn('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    return None
                 elif len(face_expt_dirs) > 1:
-                    raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    warnings.warn('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    return None
             
                 expt_directory = os.path.join(monkey_dir, expt_dirname)    
                 
