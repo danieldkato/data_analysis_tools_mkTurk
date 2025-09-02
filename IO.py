@@ -101,6 +101,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     if preprocessed_data_path is None:
         preprocessed_data_path = get_recording_path(base_data_path, monkey, date, depth=4)[0]
     
+    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
+    
     # Load metadata for current session
     recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split(os.sep)[-1]
     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
@@ -134,7 +136,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     
     # Try to retrieve THREEJS params directly from behavior files:
     behav_df = pd.DataFrame()
-    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if date in x]
+    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if pen_id in x]
     if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
         sess_dir = os.path.join(base_data_path, monkey, sess_dirs[0])
         behav_files = np.unique(trial_params_df.behav_file)
