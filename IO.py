@@ -215,7 +215,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         channels = find_channels(preprocessed_data_path)
     n_bins = len(psth_bins) - 1
     n_trials = np.max(trial_params_df['trial_num']) + 1
-    n_rsvp = 3 # < Assuming 3 RSVP stim per trial 
+    n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
 
