@@ -368,7 +368,11 @@ def create_data_mat(file):
     params = ['behav_file', 'scenefile', 'trial_num', 'rsvp_num', 'stim_id', 'stim_info', 't_mk', 'sc_t_mk', 'ph_t_rise', 'reward', 'reward_dur', 'punish_dur', 'iti_dur', 'prestim_dur']
     m = json.load(open(file,'rb'))
 
-    n_rsvp = m['TASK']['NRSVP']
+    if 'NRSVPMax' in m['TASK'].keys():
+        n_rsvp = max(m['TASK']['NRSVP'], m['TASK']['NRSVPMax'])
+    else:
+        n_rsvp = m['TASK']['NRSVP'] 
+    
     n_trials_prepared= len(m['TRIALEVENTS']['Sample']['0'])
 
     n_stims = n_rsvp * n_trials_prepared
