@@ -954,7 +954,6 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
             
             # Get brain areas recorded for current monkey:
             areas = list(set(sheet.columns).difference(set(non_area_cols)))
-            print(areas)
             
             # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
             for area in areas:
