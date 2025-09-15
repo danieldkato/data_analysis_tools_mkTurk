@@ -952,6 +952,19 @@ def read_area_label_sheets():
 
 
 
+def sample_areas(chs_df, areas, criterion='any'):
+    
+    if criterion == 'any':
+        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) > 0, axis=1)
+    elif criterion == 'all':
+        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) == len(areas), axis=1)
+        
+    chs_df = chs_df[B]
+        
+    return chs_df
+
+
+
 def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx')):
     
     # Define constants:
