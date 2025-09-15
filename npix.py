@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from numpy.matlib import repmat
 import openpyxl
+import datetime
 from data_analysis_tools_mkTurk.utils_meta import *
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
@@ -973,3 +974,46 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         
     return chs_df 
     
+
+
+def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx')):
+
+    # Load sheet:     
+    sheet = pd.read_excel('recording coordinate data.xlsx', sheet_name='brain areas')
+    sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
+
+    # Format dates to yyyymmdd str:
+    dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
+    sheet.loc[:, 'date'] = dates_fmt
+    
+    # Get brain area names:
+    area_cols = [x for x in sheet.columns if 'channel range' in x][:-1]
+    area_names = [re.search('\(\w+\)', a).group()[1:-1] for a in area_cols]
+    
+    # Initialize overall dataframe:
+    chs_df = pd.DataFrame()
+    
+    # Iterate over dates (rows):
+    for i, row in sheet.iterrows():
+    
+        # Initialize dataframe for current session:
+        curr_sess_df = pd.DataFrame({'monkey': 'West', 'date':row.date, 'area':None, 'ch_idx_depth':np.arange(384)}, index=np.arange(384))
+        
+        # Iterate over areas (columns):
+        for a, area_col in enumerate(area_cols):
+    
+            # Get channel ranges for current area:
+            ranges = re.findall('\d{2,3}-\d{2,3}', row[area_col]) if type(row[area_col])==str else [] 
+            print(ranges)
+            
+            # Iterate over channel ranges:
+            for rn in ranges:
+                bounds = [int(s) for s in rn.split('-')]
+                mn = min(bounds)
+                mx = min([383, max(bounds)])
+                rows = np.arange(mn, mx)
+                curr_sess_df.loc[rows, 'area'] = area_names[a]
+                
+        chs_df = pd.concat([chs_df, curr_sess_df], axis=0)
+        
+    return chs_df
