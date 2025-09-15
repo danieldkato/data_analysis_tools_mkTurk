@@ -984,6 +984,10 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
 
 def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx')):
 
+    # Define constants:
+    monkey = 'West' # Assume this worbook only contains area labels for West
+    n_chans = 384    
+
     # Load sheet:     
     sheet = pd.read_excel('recording coordinate data.xlsx', sheet_name='brain areas')
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
@@ -1003,10 +1007,12 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     for i, row in sheet.iterrows():
     
         # Initialize dataframe for current session:
-        curr_sess_df = pd.DataFrame({'monkey': 'West', 'date':row.date, 'area':None, 'ch_idx_depth':np.arange(384)}, index=np.arange(384))
+        sess_df = pd.DataFrame({'monkey':monkey, 'date':str(int(row.date)), 'areas':[None]*n_chans, 'ch_idx_depth':np.arange(n_chans)}, index=np.arange(n_chans)) # assume 384 channels per session
         
         # Iterate over areas (columns):
         for a, area_col in enumerate(area_cols):
+    
+            tmp = np.array([None]*n_chans)        
     
             # Get channel ranges for current area:
             ranges = re.findall('\d{2,3}-\d{2,3}', row[area_col]) if type(row[area_col])==str else [] 
@@ -1017,8 +1023,13 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
                 mn = min(bounds)
                 mx = min([383, max(bounds)])
                 rows = np.arange(mn, mx)
-                curr_sess_df.loc[rows, 'area'] = area_names[a]
+                tmp[rows] = area_names[a]
+            sess_df.loc[:, area_names[a]] = tmp
                 
-        chs_df = pd.concat([chs_df, curr_sess_df], axis=0)
+        # Merge all area labels into single 'areas'  list:
+        sess_df['areas'] = sess_df.apply(lambda x : [a for a in list(x[area_names]) if a is not None], axis=1)
+        sess_df = sess_df.drop(columns=area_names)
+            
+        chs_df = pd.concat([chs_df, sess_df], axis=0)
         
     return chs_df
