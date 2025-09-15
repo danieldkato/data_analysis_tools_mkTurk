@@ -1003,7 +1003,6 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     
             # Get channel ranges for current area:
             ranges = re.findall('\d{2,3}-\d{2,3}', row[area_col]) if type(row[area_col])==str else [] 
-            print(ranges)
             
             # Iterate over channel ranges:
             for rn in ranges:
