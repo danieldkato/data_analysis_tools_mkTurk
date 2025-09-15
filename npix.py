@@ -965,6 +965,15 @@ def sample_areas(chs_df, areas, criterion='any'):
 
 
 
+def exclude_multiarea_chs(chs_df):
+    
+    B = chs_df.apply(lambda x : len(x.areas) > 1, axis=1)
+    chs_df = chs_df[~B]
+    
+    return chs_df
+
+
+
 def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx')):
     
     # Define constants:
