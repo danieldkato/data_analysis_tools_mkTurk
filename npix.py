@@ -921,6 +921,30 @@ def session_2_chs(monkey, date=None, area=None):
 
 
 
+def read_area_label_sheets():
+    
+    # Read separate Google sheets workbooks:
+    wkbka_df = read_labeled_brain_areas_sheet() # Read workbook entitled 'labeled brain areas'
+    wkbkb_df = read_recording_coordinate_data_sheet() # Read workbook entitled 'recording coordinate data'
+    
+    # Merge workbooks:
+    chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
+    
+    # Replace any nan with empty list
+    x_hat = chs_df.apply(lambda x : [] if type(x.areas_x)==float and np.isnan(x.areas_x) else x.areas_x, axis=1)
+    y_hat = chs_df.apply(lambda x : [] if type(x.areas_y)==float and np.isnan(x.areas_y) else x.areas_y, axis=1)
+    chs_df['areas_x'] = x_hat
+    chs_df['areas_y'] = y_hat
+    
+    # Merge area labels:
+    A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
+    chs_df['areas'] = A
+    chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
+    
+    return chs_df
+
+
+
 def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx')):
     
     # Define constants:
