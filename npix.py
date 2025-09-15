@@ -927,6 +927,13 @@ def read_area_label_sheets():
     wkbka_df = read_labeled_brain_areas_sheet() # Read workbook entitled 'labeled brain areas'
     wkbkb_df = read_recording_coordinate_data_sheet() # Read workbook entitled 'recording coordinate data'
     
+    # Exclude rows with no area labels:
+    null_a = wkbka_df.apply(lambda x : len(x.areas)==0, axis=1)
+    wkbka_df = wkbka_df[~null_a]
+    
+    null_b = wkbkb_df.apply(lambda x : len(x.areas)==0, axis=1)
+    wkbkb_df = wkbkb_df[~null_b]
+    
     # Merge workbooks:
     chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
     
