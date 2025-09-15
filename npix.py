@@ -5,6 +5,7 @@ import re
 import numpy as np
 import pandas as pd
 from numpy.matlib import repmat
+import openpyxl
 from data_analysis_tools_mkTurk.utils_meta import *
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
@@ -136,7 +137,7 @@ def h5_2_ch_meta(h5path):
 
 
 
-def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=20, tip_length=175):
+def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
     """
     Compute stereotaxic coordinates of all recording sites for a given session.      
 
@@ -917,3 +918,58 @@ def session_2_chs(monkey, date=None, area=None):
     
     return output
 
+
+
+def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx')):
+    
+    # Define constants:
+    non_area_cols = ['penetration', 'date', 'configuration', 'N/A']
+    
+    # Load workbook:
+    wb = openpyxl.load_workbook(path)
+    
+    # Get names of sheets with area assignments:
+    sheetnames = wb.sheetnames
+    suffix = ' all recordings'
+    ar_shnames = [x for x in sheetnames if suffix in x]
+    
+    # Iterate over sheets (assume one per monkey):
+    chs_df = pd.DataFrame()
+    for shname in ar_shnames:
+    
+        # Get monkey name, initialize dataframe for current monkey:
+        monkey = shname[:-len(suffix)]
+        monkey_df = pd.DataFrame()
+        
+        # Load sheet:
+        sheet = pd.read_excel('labeled brain areas.xlsx', sheet_name=shname)
+        sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
+    
+        # Iterate over rows (dates) of current sheet
+        for i, row in sheet.iterrows():
+            
+            # Initialize dataframe for current session:
+            sess_df = pd.DataFrame({'monkey':monkey, 'date':str(int(row.date)), 'area':None, 'ch_idx_depth':np.arange(384)}, index=np.arange(384)) # assume 384 channels per session
+            
+            # Get brain areas recorded for current monkey:
+            areas = list(set(sheet.columns).difference(set(non_area_cols)))
+            print(areas)
+            
+            # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
+            for area in areas:
+                ranges = re.findall('\d{2,3}-\d{2,3}', row[area]) if type(row[area])==str else []
+                for rn in ranges:
+                    bounds = [int(s) for s in rn.split('-')]
+                    mn = min(bounds)
+                    mx = min([383, max(bounds)])
+                    rows = np.arange(mn, mx)
+                    sess_df.loc[rows,'area'] = area
+    
+            # Concatenate current session with dataframe for current monkey: 
+            monkey_df = pd.concat([monkey_df, sess_df], axis=0)
+    
+        # Concatenate current monkey with overall dataframe:
+        chs_df = pd.concat([chs_df, monkey_df], axis=0)
+        
+    return chs_df 
+    
