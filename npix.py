@@ -921,6 +921,28 @@ def session_2_chs(monkey, date=None, area=None):
 
 
 
+def sample_areas(chs_df, areas, criterion='any'):
+    
+    if criterion == 'any':
+        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) > 0, axis=1)
+    elif criterion == 'all':
+        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) == len(areas), axis=1)
+        
+    chs_df = chs_df[B]
+        
+    return chs_df
+
+
+
+def exclude_multiarea_chs(chs_df):
+    
+    B = chs_df.apply(lambda x : len(x.areas) > 1, axis=1)
+    chs_df = chs_df[~B]
+    
+    return chs_df
+
+
+
 def read_area_label_sheets():
     
     # Read separate Google sheets workbooks:
@@ -947,28 +969,6 @@ def read_area_label_sheets():
     A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
     chs_df['areas'] = A
     chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
-    
-    return chs_df
-
-
-
-def sample_areas(chs_df, areas, criterion='any'):
-    
-    if criterion == 'any':
-        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) > 0, axis=1)
-    elif criterion == 'all':
-        B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) == len(areas), axis=1)
-        
-    chs_df = chs_df[B]
-        
-    return chs_df
-
-
-
-def exclude_multiarea_chs(chs_df):
-    
-    B = chs_df.apply(lambda x : len(x.areas) > 1, axis=1)
-    chs_df = chs_df[~B]
     
     return chs_df
 
