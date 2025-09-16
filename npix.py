@@ -1100,6 +1100,8 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     wkbkb_df = wkbkb_df[~null_b]
     
     # Merge workbooks:
+    print('wkbka_df.shape={}'.format(wkbka_df.shape))
+    print('wkbkb_df.shape={}'.format(wkbkb_df.shape))
     chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
     
     # Replace any nan with empty list
@@ -1152,7 +1154,10 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         # Load sheet:
         sheet = pd.read_excel(path, sheet_name=shname)
         sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
-    
+        
+        # Convert date to str:
+        sheet['date'] = sheet['date'].astype(int).astype(str) 
+
         # Apply any miscellaneous filters:
         if flt is not None:
             sheet = sheet[sheet.apply(flt, axis=1)]
