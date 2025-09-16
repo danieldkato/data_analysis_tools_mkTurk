@@ -1155,7 +1155,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
         # Apply any miscellaneous filters:
         if flt is not None:
-            sheet = sheet[sheet.apply(flt)]
+            sheet = sheet[sheet.apply(flt, axis=1)]
     
         # Iterate over rows (dates) of current sheet
         for i, row in sheet.iterrows():
@@ -1209,7 +1209,7 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
 
     # Optionally apply any additional filters:
     if flt is not None:
-        sheet = sheet[sheet.apply(flt)]
+        sheet = sheet[sheet.apply(flt, axis=1)]
 
     # Format dates to yyyymmdd str:
     dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
