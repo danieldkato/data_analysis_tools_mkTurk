@@ -1070,7 +1070,7 @@ def read_area_label_sheets():
 
 
 
-def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx')):
+def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'), flt=None):
     
     # Define constants:
     n_chans = 384
@@ -1095,6 +1095,10 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         # Load sheet:
         sheet = pd.read_excel('labeled brain areas.xlsx', sheet_name=shname)
         sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
+    
+        # Apply any miscellaneous filters:
+        if flt is None:
+            sheet = sheet[sheet.apply(flt)]
     
         # Iterate over rows (dates) of current sheet
         for i, row in sheet.iterrows():
@@ -1131,7 +1135,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
 
 
-def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx')):
+def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'), flt=None):
 
     # Define constants:
     monkey = 'West' # Assume this worbook only contains area labels for West
@@ -1140,6 +1144,10 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     # Load sheet:     
     sheet = pd.read_excel('recording coordinate data.xlsx', sheet_name='brain areas')
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
+
+    # Optionally apply any additional filters:
+    if flt is not None:
+        sheet = sheet[sheet.apply(flt)]
 
     # Format dates to yyyymmdd str:
     dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
