@@ -1040,6 +1040,43 @@ def exclude_multiarea_chs(chs_df, tree=None):
 
 
 def read_area_label_sheets(exclude_multilabels=False, tree=None, flt=None):
+    """
+    Read channelwise brain area assignments from AG's spreadsheets.
+
+    Parameters
+    ----------
+    exclude_multilabels : bool, optional
+        Whether to exclude channels associated with more than one brain area. 
+        The default is False.
+
+    tree : dict, optional
+        Dict specifying hierarchical relationships between brain areas. Use this 
+        to define exceptions to excluding channels associated with more than one 
+        brain area (e.g., a channel may be in both IT and TE0 because IT contains
+        TE0). If None, then setting `exclude_multiabels` to True will exclude all
+        channels associated with more than one brain area. See exclude_multiarea_chs()
+        docstring for detail. The default is None.
+
+    flt : function, optional
+        Boolean function used to specify subset of channels to retrieve labels for. 
+        Must be applicable to a single row of a dataframe defining same columns 
+        as output of read_labeled_brain_areas_sheet() and read_recording_coordinates_data_sheet(). 
+        Only rows (channels) evaluating to True under flt will be included in 
+        output dataframe. The default is None.
+
+    Returns
+    -------
+    chs_df : pandas.core.frame.DataFrame
+        Dataframe mapping channels to brain areas. Defines the following columns:
+            
+            ch_idx_depth : int
+                Rank order of corresponding channel's depth on probe. Higher 
+                indeices are more superficial. 
+                
+            areas : list
+                List of brain areas associated with channel.
+
+    """
     
     # Read separate Google sheets workbooks:
     wkbka_df = read_labeled_brain_areas_sheet(flt=flt) # Read workbook entitled 'labeled brain areas'
