@@ -8,6 +8,7 @@ from numpy.matlib import repmat
 import openpyxl
 import datetime
 from data_analysis_tools_mkTurk.utils_meta import *
+import warnings
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
     refID=0, ap_gain=500, lf_gain=250, ap_highpass=True, output_directory=None):
@@ -1102,8 +1103,27 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     # Merge workbooks:
     print('wkbka_df.shape={}'.format(wkbka_df.shape))
     print('wkbkb_df.shape={}'.format(wkbkb_df.shape))
-    chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
+    W = [wkbka_df, wkbkb_df]
+    nonempty_dfs = [w for w in W if w.shape[0]]
     
+    # If the dataframes returned from 'labeled brain areas' and 'recording 
+    # coordinate data' both include more than zero rows, then merge:
+    if len(nonempty_dfs) == 2:
+        chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
+        
+    # If exactly one of the dataframes returned from 'labeled brain areas' or
+    # 'recording coordinate data' includes more than zero rows, just return 
+    # keep the non-empty dataframe:
+    elif len(nonempty_dfs) == 1:
+        chs_df = nonempty_dfs[0]
+        
+    # If neither dataframe returned from either 'labeled brain areas' or 'recording
+    # coordinate data' includes more than zero rows, return empty dataframe:        
+    else:
+        warnings.warn('No channels match requested criteria; returning empty dataframe.')
+        chs_df = pd.DataFrame()
+        return chs_df
+        
     # Replace any nan with empty list
     x_hat = chs_df.apply(lambda x : [] if type(x.areas_x)==float and np.isnan(x.areas_x) else x.areas_x, axis=1)
     y_hat = chs_df.apply(lambda x : [] if type(x.areas_y)==float and np.isnan(x.areas_y) else x.areas_y, axis=1)
@@ -1212,13 +1232,15 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     sheet = pd.read_excel(path, sheet_name='brain areas')
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
 
-    # Optionally apply any additional filters:
-    if flt is not None:
-        sheet = sheet[sheet.apply(flt, axis=1)]
-
     # Format dates to yyyymmdd str:
     dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
     sheet.loc[:, 'date'] = dates_fmt
+
+    print('Dates = {}'.format(sheet.date.unique()))
+
+    # Optionally apply any additional filters:
+    if flt is not None:
+        sheet = sheet[sheet.apply(flt, axis=1)]
     
     # Get brain area names:
     area_cols = [x for x in sheet.columns if 'channel range' in x][:-1]
