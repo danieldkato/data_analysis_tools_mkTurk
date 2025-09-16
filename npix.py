@@ -1150,7 +1150,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         monkey_df = pd.DataFrame()
         
         # Load sheet:
-        sheet = pd.read_excel('labeled brain areas.xlsx', sheet_name=shname)
+        sheet = pd.read_excel(path, sheet_name=shname)
         sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
     
         # Apply any miscellaneous filters:
@@ -1204,7 +1204,7 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     n_chans = 384    
 
     # Load sheet:     
-    sheet = pd.read_excel('recording coordinate data.xlsx', sheet_name='brain areas')
+    sheet = pd.read_excel(path, sheet_name='brain areas')
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
 
     # Optionally apply any additional filters:
