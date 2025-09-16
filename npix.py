@@ -1039,12 +1039,22 @@ def exclude_multiarea_chs(chs_df, tree=None):
 
 
 
-def read_area_label_sheets(exclude_multilabels=False, tree=None, flt=None):
+def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'),
+        recording_coords_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'),
+        exclude_multilabels=False, tree=None, flt=None):
     """
     Read channelwise brain area assignments from AG's spreadsheets.
 
     Parameters
     ----------
+    labeled_brain_areas_path : str, optional
+        Path to 'labeled brain areas' spreadsheet.
+        
+        
+    recording_coords_path : str, optional
+        Path to 'recording coordinate data' spreadsheet.
+    
+    
     exclude_multilabels : bool, optional
         Whether to exclude channels associated with more than one brain area. 
         The default is False.
@@ -1079,8 +1089,8 @@ def read_area_label_sheets(exclude_multilabels=False, tree=None, flt=None):
     """
     
     # Read separate Google sheets workbooks:
-    wkbka_df = read_labeled_brain_areas_sheet(flt=flt) # Read workbook entitled 'labeled brain areas'
-    wkbkb_df = read_recording_coordinate_data_sheet(flt=flt) # Read workbook entitled 'recording coordinate data'
+    wkbka_df = read_labeled_brain_areas_sheet(labeled_brain_areas_path, flt=flt) # Read workbook entitled 'labeled brain areas'
+    wkbkb_df = read_recording_coordinate_data_sheet(recording_coords_path, flt=flt) # Read workbook entitled 'recording coordinate data'
     
     # Exclude rows with no area labels:
     null_a = wkbka_df.apply(lambda x : len(x.areas)==0, axis=1)
