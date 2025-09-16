@@ -1092,13 +1092,22 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     # Read separate Google sheets workbooks:
     wkbka_df = read_labeled_brain_areas_sheet(labeled_brain_areas_path, flt=flt) # Read workbook entitled 'labeled brain areas'
     wkbkb_df = read_recording_coordinate_data_sheet(recording_coords_path, flt=flt) # Read workbook entitled 'recording coordinate data'
+
+    # Replace any nan with empty list
+    areas_hat_a = wkbka_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
+    wkbka_df['areas'] = areas_hat_a
     
+    areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
+    wkbkb_df['areas'] = areas_hat_b
+    
+    """
     # Exclude rows with no area labels:
     null_a = wkbka_df.apply(lambda x : len(x.areas)==0, axis=1)
     wkbka_df = wkbka_df[~null_a]
     
     null_b = wkbkb_df.apply(lambda x : len(x.areas)==0, axis=1)
     wkbkb_df = wkbkb_df[~null_b]
+    """
     
     # Merge workbooks:
     print('wkbka_df.shape={}'.format(wkbka_df.shape))
@@ -1110,6 +1119,11 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     # coordinate data' both include more than zero rows, then merge:
     if len(nonempty_dfs) == 2:
         chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
+        
+        # Merge area labels:
+        A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
+        chs_df['areas'] = A
+        chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
         
     # If exactly one of the dataframes returned from 'labeled brain areas' or
     # 'recording coordinate data' includes more than zero rows, just return 
@@ -1123,17 +1137,6 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         warnings.warn('No channels match requested criteria; returning empty dataframe.')
         chs_df = pd.DataFrame()
         return chs_df
-        
-    # Replace any nan with empty list
-    x_hat = chs_df.apply(lambda x : [] if type(x.areas_x)==float and np.isnan(x.areas_x) else x.areas_x, axis=1)
-    y_hat = chs_df.apply(lambda x : [] if type(x.areas_y)==float and np.isnan(x.areas_y) else x.areas_y, axis=1)
-    chs_df['areas_x'] = x_hat
-    chs_df['areas_y'] = y_hat
-    
-    # Merge area labels:
-    A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
-    chs_df['areas'] = A
-    chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
     
     # Optionally exclude channels associated with more than one brain area:
     if exclude_multilabels:
