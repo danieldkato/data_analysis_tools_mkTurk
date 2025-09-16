@@ -922,6 +922,33 @@ def session_2_chs(monkey, date=None, area=None):
 
 
 def sample_areas(chs_df, areas, criterion='any'):
+    """
+    Select channels by brain area. 
+
+    Parameters
+    ----------
+    chs_df : pandas.core.frame.DataFrame
+        Dataframe of channels, each row corresponding to a single channel. Must 
+        define an 'areas' column, each entry of which is a list of brain areas 
+        associated with the corresponding channel. Channels may be associated 
+        with zero, one, or more brain areas. 
+        
+        
+    areas : list
+        List of brain areas to sample channels from.
+        
+    criterion : 'any' | 'all', optional
+        How to select channels from multiple brain areas. If 'any', then channels
+        need only be associated with one area specified in `areas` param. If 'all',
+        then a channel must be associated with all brain areas in `areas` in order
+        to be included in output dataframe. The default is 'any'.
+
+    Returns
+    -------
+    chs_df : pandas.core.frame.DataFrame
+        Filtered dataframe.
+
+    """
     
     if criterion == 'any':
         B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) > 0, axis=1)
