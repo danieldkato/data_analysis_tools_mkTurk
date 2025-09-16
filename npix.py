@@ -1154,7 +1154,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
     
         # Apply any miscellaneous filters:
-        if flt is None:
+        if flt is not None:
             sheet = sheet[sheet.apply(flt)]
     
         # Iterate over rows (dates) of current sheet
