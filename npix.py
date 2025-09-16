@@ -1039,11 +1039,11 @@ def exclude_multiarea_chs(chs_df, tree=None):
 
 
 
-def read_area_label_sheets():
+def read_area_label_sheets(exclude_multilabels=False, tree=None, flt=None):
     
     # Read separate Google sheets workbooks:
-    wkbka_df = read_labeled_brain_areas_sheet() # Read workbook entitled 'labeled brain areas'
-    wkbkb_df = read_recording_coordinate_data_sheet() # Read workbook entitled 'recording coordinate data'
+    wkbka_df = read_labeled_brain_areas_sheet(flt=flt) # Read workbook entitled 'labeled brain areas'
+    wkbkb_df = read_recording_coordinate_data_sheet(flt=flt) # Read workbook entitled 'recording coordinate data'
     
     # Exclude rows with no area labels:
     null_a = wkbka_df.apply(lambda x : len(x.areas)==0, axis=1)
@@ -1065,6 +1065,10 @@ def read_area_label_sheets():
     A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
     chs_df['areas'] = A
     chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
+    
+    # Optionally exclude channels associated with more than one brain area:
+    if exclude_multilabels:
+        chs_df = exclude_multiarea_chs(chs_df)
     
     return chs_df
 
