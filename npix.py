@@ -934,12 +934,37 @@ def sample_areas(chs_df, areas, criterion='any'):
 
 
 
-def exclude_multiarea_chs(chs_df):
+def exclude_multiarea_chs(chs_df, tree={'IT':['TE0', 'TE2', 'TE3'], 'MT':['PHC', 'HC'], 'WM':['wm']}):
     
-    B = chs_df.apply(lambda x : len(x.areas) > 1, axis=1)
-    chs_df = chs_df[~B]
+    if tree is not None:
+        root_areas = tree.keys()
+    else:
+        root_areas = []
     
-    return chs_df
+    # Split brain areas into 'root' and 'leaf' areas: 
+    R = chs_df.apply(lambda x : list(set(x.areas).intersection(root_areas)), axis=1)
+    L = chs_df.apply(lambda x : list(set(x.areas).difference(root_areas)), axis=1)
+    chs_df['root_areas'] = R
+    chs_df['leaf_areas'] = L
+    
+    # Find rows associated with more than one 'root' area:
+    multiroot = chs_df.apply(lambda x : len(x.root_areas)>1, axis=1)
+    
+    # Find rows associated with more than one 'leaf' area:
+    multileaf = chs_df.apply(lambda x : len(x.leaf_areas)>1, axis=1)
+    
+    # Find rows where leaf area doesn't match root:
+    mismatch = chs_df.apply(lambda x : len(x.root_areas)>0 and np.any([leaf not in tree[x.root_areas[0]] for leaf in x.leaf_areas]), axis=1)
+    
+    # Exlude rows associated with more than one root or more than one leaf:
+    chs_df_hat = chs_df[~multiroot & ~multileaf & ~mismatch]
+    #Ehat = E
+    
+    # Merge roots and leaves:
+    A = chs_df_hat.apply(lambda x : x.root_areas + x.leaf_areas, axis=1)
+    chs_df_hat['areas'] = A
+    
+    return chs_df_hat
 
 
 
