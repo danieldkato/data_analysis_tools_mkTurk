@@ -934,7 +934,51 @@ def sample_areas(chs_df, areas, criterion='any'):
 
 
 
-def exclude_multiarea_chs(chs_df, tree={'IT':['TE0', 'TE2', 'TE3'], 'MT':['PHC', 'HC'], 'WM':['wm']}):
+def exclude_multiarea_chs(chs_df, tree=None):
+    """
+    Excldue channels associated with more than one brain area.   
+    
+    Optionally, specify exceptions if brain areas are organized hierarchically 
+    (e.g., allow channels to be labeled both 'IT' and 'TE0' since the latter is
+     a sub-area of the former). 
+    
+
+    Parameters
+    ----------
+    chs_df : pandas.core.frame.DataFrame
+        Dataframe of area labels, each row a channel. Should define an 'areas'
+        column, each element of which is a list of area labels associated with
+        the corresponding channel. Each channel may be associated with zero, one,
+        or multiple brain areas.
+            
+    tree : dict, optional
+        Dictionary specifying hierarchical organization of different brain areas. 
+        Use this to allow for multiple area labels per channel if one area is 
+        a sub-area of another (e.g., a channel can be in both IT and TE0 because
+        TE0 is a sub-area of IT).  
+        
+        Each key should correspond to a "superordinate" brain area, and its value
+        should be a list of "subordinate" areas. E.g.,:
+    
+            tree = {'IT':['TE0', 'TE2', 'TE3'], 
+                    'MT':['PHC', 'HC'], 
+                    'WM':['wm']}
+            
+        Here, area (key) 'IT' includes sub-areas (value) 'TE0', 'TE2', and 'TE3', 
+        while area 'MT' includes sub-areas 'PHC' and 'HC'. The final key 'WM' 
+        simply specifies an alias, evaluating to a (lowercase) synonym contained
+        in a singleton list.
+        
+        Set to None in order to simply exclude all dataframe rows associated with
+        more than one label. 
+        
+        
+    Returns
+    -------
+    chs_df_hat : pandas.core.frame.DataFrame
+        Filtered dataframe.
+
+    """
     
     if tree is not None:
         root_areas = tree.keys()
