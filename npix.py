@@ -1122,6 +1122,12 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
 
 
 def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'), flt=None):
+    """
+    Read 'labeled brain areas'  spreadsheet, which includes AG's area labels for 
+    all recording sessions from Bourgeois as of 20250916, as well as several sessions
+    from West.
+
+    """
     
     # Define constants:
     n_chans = 384
@@ -1187,6 +1193,11 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
 
 
 def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'), flt=None):
+    """
+    Read 'recording coordinate data'  spreadsheet, which includes AG's area labels for 
+    recording sessions from West spanning 20231017 to 20240325.
+
+    """
 
     # Define constants:
     monkey = 'West' # Assume this worbook only contains area labels for West
