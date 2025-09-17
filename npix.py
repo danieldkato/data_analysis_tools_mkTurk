@@ -1158,7 +1158,7 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         chs_df = chs_df[~is_oob]
     
     # Replace empty lists with None:
-    A = chs_df.apply(lambda x : x.areas if len(x.areas)>0 else None, axis=1)
+    A = chs_df.apply(lambda x : x.areas if len(x.areas)>0 else ['unknown'], axis=1)
     chs_df['areas'] = A
     
     return chs_df
