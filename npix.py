@@ -922,7 +922,7 @@ def session_2_chs(monkey, date=None, area=None):
 
 
 
-def sample_areas(chs_df, areas, criterion='any'):
+def select_areas(chs_df, areas, criterion='any'):
     """
     Select channels by brain area. 
 
