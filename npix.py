@@ -1205,11 +1205,12 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
             
             # Get brain areas recorded for current monkey:
             areas = list(set(sheet.columns).difference(set(non_area_cols)))
+            print('date={}, areas={}'.format(row.date, areas))
             
             # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
             for area in areas:
                 tmp = np.array([None]*n_chans)
-                ranges = re.findall('\d{2,3}-\d{2,3}', row[area]) if type(row[area])==str else []
+                ranges = re.findall('\d{1,3}-\d{1,3}', row[area]) if type(row[area])==str else []
                 for rn in ranges:
                     bounds = [int(s) for s in rn.split('-')]
                     mn = min(bounds)
@@ -1276,7 +1277,7 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
             tmp = np.array([None]*n_chans)        
     
             # Get channel ranges for current area:
-            ranges = re.findall('\d{2,3}-\d{2,3}', row[area_col]) if type(row[area_col])==str else [] 
+            ranges = re.findall('\d{1,3}-\d{1,3}', row[area_col]) if type(row[area_col])==str else [] 
             
             # Iterate over channel ranges:
             for rn in ranges:
