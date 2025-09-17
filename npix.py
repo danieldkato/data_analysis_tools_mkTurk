@@ -1093,13 +1093,6 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     wkbka_df = read_labeled_brain_areas_sheet(labeled_brain_areas_path, flt=flt) # Read workbook entitled 'labeled brain areas'
     wkbkb_df = read_recording_coordinate_data_sheet(recording_coords_path, flt=flt) # Read workbook entitled 'recording coordinate data'
 
-    # Replace any nan with empty list
-    areas_hat_a = wkbka_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
-    wkbka_df['areas'] = areas_hat_a
-    
-    areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
-    wkbkb_df['areas'] = areas_hat_b
-    
     """
     # Exclude rows with no area labels:
     null_a = wkbka_df.apply(lambda x : len(x.areas)==0, axis=1)
@@ -1119,6 +1112,13 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     # coordinate data' both include more than zero rows, then merge:
     if len(nonempty_dfs) == 2:
         chs_df = pd.merge(wkbka_df, wkbkb_df, on=['monkey', 'date', 'ch_idx_depth'], how='outer')
+
+        # Replace any nan with empty list
+        areas_hat_a = wkbka_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
+        wkbka_df['areas'] = areas_hat_a
+        
+        areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
+        wkbkb_df['areas'] = areas_hat_b
         
         # Merge area labels:
         A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
