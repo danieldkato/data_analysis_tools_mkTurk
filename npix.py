@@ -1,6 +1,7 @@
 import os
 import sys
 import pathlib
+import numbers
 import re
 import numpy as np
 import pandas as pd
@@ -1196,6 +1197,8 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
         # Load sheet:
         sheet = pd.read_excel(path, sheet_name=shname)
         sheet = sheet[~sheet.date.isna()] # Exclude spreadsheet rows with no date
+        isnum =sheet.apply(lambda x : isinstance(x.date, numbers.Number), axis=1)
+        sheet = sheet[isnum]
         
         # Convert date to str:
         sheet['date'] = sheet['date'].astype(int).astype(str) 
@@ -1212,7 +1215,6 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
             
             # Get brain areas recorded for current monkey:
             areas = list(set(sheet.columns).difference(set(non_area_cols)))
-            print('date={}, areas={}'.format(row.date, areas))
             
             # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
             for area in areas:
