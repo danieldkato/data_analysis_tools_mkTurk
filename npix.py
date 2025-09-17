@@ -1050,7 +1050,7 @@ def exclude_multiarea_chs(chs_df, tree=None):
 
 def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'),
         recording_coords_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'),
-        exclude_multilabels=False, tree=None, flt=None):
+        exclude_oob=True, exclude_multilabels=False, tree=None, flt=None):
     """
     Read channelwise brain area assignments from AG's spreadsheets.
 
@@ -1062,7 +1062,9 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         
     recording_coords_path : str, optional
         Path to 'recording coordinate data' spreadsheet.
-    
+        
+    exclude_oob : bool, optional
+        Whether to exclude out-of-brain ('N/A') channels. The default is True.
     
     exclude_multilabels : bool, optional
         Whether to exclude channels associated with more than one brain area. 
@@ -1149,6 +1151,11 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     # Optionally exclude channels associated with more than one brain area:
     if exclude_multilabels:
         chs_df = exclude_multiarea_chs(chs_df)
+    
+    # Optionally exclude out-of-brain channels:
+    if exclude_oob:
+        is_oob = chs_df.apply(lambda x : 'N/A' in x.areas, axis=1)
+        chs_df = chs_df[~is_oob]
     
     # Replace empty lists with None:
     A = chs_df.apply(lambda x : x.areas if len(x.areas)>0 else None, axis=1)
