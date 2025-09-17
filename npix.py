@@ -951,6 +951,10 @@ def select_areas(chs_df, areas, criterion='any'):
 
     """
     
+    # Return all channels if not requesting specific areas:
+    if areas == 'all' or areas == ['all']:
+        return chs_df
+    
     # Exclude channels not associated with any area:
     chs_df = chs_df[~chs_df.areas.isna()]
     
