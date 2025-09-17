@@ -951,6 +951,10 @@ def select_areas(chs_df, areas, criterion='any'):
 
     """
     
+    # Exclude channels not associated with any area:
+    chs_df = chs_df[~chs_df.areas.isna()]
+    
+    # Select channels by area:
     if criterion == 'any':
         B = chs_df.apply(lambda x : len(list(set(x.areas).intersection(set(areas)))) > 0, axis=1)
     elif criterion == 'all':
