@@ -1048,8 +1048,8 @@ def exclude_multiarea_chs(chs_df, tree=None):
 
 
 
-def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'),
-        recording_coords_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'),
+def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'labeled brain areas.xlsx'),
+        recording_coords_path = os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'),
         exclude_oob=True, exclude_multilabels=False, tree=None, flt=None):
     """
     Read channelwise brain area assignments from AG's spreadsheets.
@@ -1165,7 +1165,7 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
 
 
 
-def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'labeled brain areas.xlsx'), flt=None):
+def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'labeled brain areas.xlsx'), flt=None):
     """
     Read 'labeled brain areas'  spreadsheet, which includes AG's area labels for 
     all recording sessions from Bourgeois as of 20250916, as well as several sessions
@@ -1240,7 +1240,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
 
 
-def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'ephys', 'recording coordinate data.xlsx'), flt=None):
+def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'), flt=None):
     """
     Read 'recording coordinate data'  spreadsheet, which includes AG's area labels for 
     recording sessions from West spanning 20231017 to 20240325.
