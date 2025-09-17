@@ -1137,10 +1137,14 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         warnings.warn('No channels match requested criteria; returning empty dataframe.')
         chs_df = pd.DataFrame()
         return chs_df
-    
+            
     # Optionally exclude channels associated with more than one brain area:
     if exclude_multilabels:
         chs_df = exclude_multiarea_chs(chs_df)
+    
+    # Replace empty lists with None:
+    A = chs_df.apply(lambda x : x.areas if len(x.areas)>0 else None, axis=1)
+    chs_df['areas'] = A
     
     return chs_df
 
