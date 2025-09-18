@@ -1114,8 +1114,6 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     """
     
     # Merge workbooks:
-    print('wkbka_df.shape={}'.format(wkbka_df.shape))
-    print('wkbkb_df.shape={}'.format(wkbkb_df.shape))
     W = [wkbka_df, wkbkb_df]
     nonempty_dfs = [w for w in W if w.shape[0]]
     
@@ -1260,8 +1258,6 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     # Format dates to yyyymmdd str:
     dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
     sheet.loc[:, 'date'] = dates_fmt
-
-    print('Dates = {}'.format(sheet.date.unique()))
 
     # Optionally apply any additional filters:
     if flt is not None:
