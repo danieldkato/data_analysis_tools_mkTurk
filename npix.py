@@ -1,4 +1,5 @@
 import os
+import glob
 import sys
 import pathlib
 import numbers
@@ -420,8 +421,8 @@ def extract_imro_table(metadata_path):
 def get_sess_metadata_path(base_data_path, monkey, date):
     
     data_path = get_recording_path(base_data_path, monkey, date, depth = 4)[0]
-    fnames = os.listdir(data_path)
-    metafiles = [x for x in fnames if '.ap.meta' in x]
+    pattern = os.path.join(data_path, '**', '*.ap.meta')
+    metafiles =  glob.glob(pattern, recursive=True)
     if len(metafiles)>0:
         mfile = metafiles[0]
         session_metadata_path = os.path.join(data_path, mfile)
