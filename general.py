@@ -1440,3 +1440,12 @@ def round_ud(x, decimals=2, direction='up'):
     xhat = z/(10**decimals)
 
     return xhat    
+
+
+
+def reformat_date(date_in):
+    
+    m, d, y = date_in.split('/')
+    date_out = y + m.zfill(2) + d.zfill(2)
+        
+    return date_out
