@@ -304,8 +304,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             #"""
             
             # Write channel coordinates:
-            zero_coords.to_hdf(output_path, 'zero_coordinates', 'a', format='fixed')
-            imro_tbl.to_hdf(output_path, 'imro_table', 'a', format='fixed')
+            zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
+            imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
             
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
