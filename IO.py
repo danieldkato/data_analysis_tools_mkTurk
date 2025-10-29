@@ -754,14 +754,14 @@ def standardize_col_types(df):
 
 
 
-def find_im_full_paths(df):
+def find_im_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'Data')):
 
     # Find unique scenefiles:
     sfiles_df = df[['monkey', 'scenefile']].drop_duplicates()
     sfiles_df['scenefile'] = sfiles_df.apply(lambda x: x.scenefile.split('/')[-1][:-5], axis=1) # Extract core scenefile name
 
     # Find saved image directory for each scenefile:
-    saved_imgs_directories = sfiles_df.apply(lambda x : sfile_2_sv_img_dir(x.scenefile, monkey=x.monkey), axis=1).values
+    saved_imgs_directories = sfiles_df.apply(lambda x : sfile_2_sv_img_dir(x.scenefile, monkey=x.monkey, base_data_directory=base_data_directory), axis=1).values
 
     # Find all images in each saved image directory:
     im_path_df = pd.DataFrame()
