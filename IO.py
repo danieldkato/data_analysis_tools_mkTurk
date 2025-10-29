@@ -177,7 +177,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_params_df['reward_bool'] = sess_meta_df.reward_bool
     
     # Try to get paths to saved images:
-    trial_params_df = find_im_full_paths(trial_params_df, base_data_path)
+    trial_params_df = add_im_full_paths(trial_params_df, base_data_path)
         
     # Copy general timing params to own dict as formal return:
     bin_width = stim_meta[stim_ids[0]]['binwidth'] # < Hack; assuming (probably safely) that same for all stim
@@ -754,7 +754,7 @@ def standardize_col_types(df):
 
 
 
-def find_im_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'Data')):
+def df_2_img_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'Data')):
 
     # Find unique scenefiles:
     sfiles_df = df[['monkey', 'scenefile']].drop_duplicates()
@@ -846,8 +846,7 @@ def sv_img_dir_2_im_paths(sv_img_dir):
 
 
 
-"""
-def find_im_full_paths(trial_params_df, local_data_path=None):
+def add_im_full_paths(trial_params_df, local_data_path=None):
     
     # If input dataframe already has img_full_path columns, delete it; will replace
     if 'img_full_path' in trial_params_df.columns:
@@ -926,7 +925,6 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
            on=['monkey', 'date', 'scenefile', 'stim_idx'], how='left')    
 
     return trial_params_df
-"""
 
 
 
