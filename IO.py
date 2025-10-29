@@ -775,6 +775,7 @@ def df_2_img_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 
     # Reorder columns, rows:
     im_path_df = im_path_df[['monkey', 'scenefile', 'scenefile_img_idx', 'img_full_path']]
     im_path_df = im_path_df.sort_values(by=['monkey', 'scenefile', 'scenefile_img_idx'])
+    im_path_df.index = np.arange(im_path_df.shape)
     
     return im_path_df
 
