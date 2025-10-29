@@ -775,7 +775,7 @@ def df_2_img_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 
     # Reorder columns, rows:
     im_path_df = im_path_df[['monkey', 'scenefile', 'scenefile_img_idx', 'img_full_path']]
     im_path_df = im_path_df.sort_values(by=['monkey', 'scenefile', 'scenefile_img_idx'])
-    im_path_df.index = np.arange(im_path_df.shape)
+    im_path_df.index = np.arange(im_path_df.shape[0])
     
     return im_path_df
 
@@ -836,7 +836,7 @@ def sv_img_dir_2_im_paths(sv_img_dir):
     imgs = [x for x in os.listdir(sv_img_dir) if re.search('_index\d+.png', x) is not None]
 
     # Extract image indices:
-    img_indices = [re.search('_index\d+.png', img).group()[6:][:-4] for img in imgs] 
+    img_indices = [(re.search('_index\d+.png', img).group()[6:][:-4]) for img in imgs] 
     
     # Create dataframe:
     im_paths_df = pd.DataFrame()
