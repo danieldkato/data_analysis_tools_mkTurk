@@ -3,6 +3,7 @@ import sys
 import time
 import pathlib as Path
 import h5py
+import glob
 import pickle
 import json
 import warnings
@@ -753,6 +754,99 @@ def standardize_col_types(df):
 
 
 
+def find_im_full_paths(df):
+
+    # Find unique scenefiles:
+    sfiles_df = df[['monkey', 'scenefile']].drop_duplicates()
+    sfiles_df['scenefile'] = sfiles_df.apply(lambda x: x.scenefile.split('/')[-1][:-5], axis=1) # Extract core scenefile name
+
+    # Find saved image directory for each scenefile:
+    saved_imgs_directories = sfiles_df.apply(lambda x : sfile_2_sv_img_dir(x.scenefile, monkey=x.monkey), axis=1).values
+
+    # Find all images in each saved image directory:
+    im_path_df = pd.DataFrame()
+    for s, sdir in enumerate(saved_imgs_directories):
+
+        curr_im_path_df = sv_img_dir_2_im_paths(sdir)
+        curr_im_path_df['monkey'] = sfiles_df.iloc[s].monkey
+        curr_im_path_df['scenefile'] = sfiles_df.iloc[s].scenefile
+        im_path_df = pd.concat([im_path_df, curr_im_path_df], axis=0)
+
+    # Reorder columns, rows:
+    im_path_df = im_path_df[['monkey', 'scenefile', 'scenefile_img_idx', 'img_full_path']]
+    im_path_df = im_path_df.sort_values(by=['monkey', 'scenefile', 'scenefile_img_idx'])
+    
+    return im_path_df
+
+
+
+def sfile_2_sv_img_dir(sfile_name, base_data_directory=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'Data'), monkey=None):
+
+    # Optionally restrict search to monkey-specific saved images directory; speeds things up ~20X
+    if monkey is not None:
+        search_root = os.path.join(base_data_directory, monkey, 'Saved_Images') 
+    else:
+        search_root = base_data_directory
+
+    # Define search string:
+    search_str = os.path.join(search_root, '**', sfile_name+'.json')
+    matches = glob.glob(search_str, recursive=True)
+
+    # If exactly one scenefile matches search term, return it:
+    if len(matches) == 1:
+        match = matches[0]
+        scenefile_directory = os.path.split(match)[0]
+
+    # If no scenefiles match search term:
+    elif len(matches) == 0:
+        warnings.warn('No saved images folder for requested scenefile {} discovered.'.format(sfile_name))
+        scenefile_directory = None
+
+    # If more than one scenefile matches search term: 
+    elif len(matches) > 1:
+
+        # HACK: Exclude any path with 'other' in title:
+        matches = [m for m in matches if 'other' not in m]
+        
+        # HACK: Exclude any path with 'scenefiles_update' in title:
+        matches = [m for m in matches if 'scenefile_update' not in m]
+
+        # If there are stil multiple saved image directories matching query, just arbitrarily choose first one and raise warning 
+        # ASSUMES ALL SCENEFILES WITH SAME NAME INCLUDE SAME IMAGES!!!
+        # TODO: Do a better job of resolving ambiguities!!
+        warn_str = '\n'.join(['More than one saved images folder discovered for scenefile {}:'.format(sfile_name, matches),
+            '\n'.join(matches),
+            'Selecting path to first saved images directory {}.'.format(matches[0]),
+        ]) + '\n'
+        warnings.warn(warn_str)
+            
+        #warnings.warn('More than one saved images folder discovered for scenefile {}:'.format(sfile_name, matches))  
+        #warnings.warn('\n'.join(matches))
+        match = matches[0]
+        scenefile_directory = os.path.split(match)[0]
+    
+    return scenefile_directory
+
+
+
+def sv_img_dir_2_im_paths(sv_img_dir):
+
+    # Select image files:
+    imgs = [x for x in os.listdir(sv_img_dir) if re.search('_index\d+.png', x) is not None]
+
+    # Extract image indices:
+    img_indices = [re.search('_index\d+.png', img).group()[6:][:-4] for img in imgs] 
+    
+    # Create dataframe:
+    im_paths_df = pd.DataFrame()
+    im_paths_df['scenefile_img_idx'] = img_indices
+    im_paths_df['img_full_path'] = [os.path.join(sv_img_dir, img) for img in imgs]    
+    
+    return im_paths_df
+
+
+
+"""
 def find_im_full_paths(trial_params_df, local_data_path=None):
     
     # If input dataframe already has img_full_path columns, delete it; will replace
@@ -832,6 +926,7 @@ def find_im_full_paths(trial_params_df, local_data_path=None):
            on=['monkey', 'date', 'scenefile', 'stim_idx'], how='left')    
 
     return trial_params_df
+"""
 
 
 
