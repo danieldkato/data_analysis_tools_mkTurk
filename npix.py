@@ -1178,7 +1178,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
     # Define constants:
     n_chans = 384
-    non_area_cols = ['penetration', 'date', 'configuration']
+    non_area_cols = ['penetration', 'date', 'configuration', 'general notes']
     
     # Load workbook:
     wb = openpyxl.load_workbook(path)
