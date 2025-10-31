@@ -1161,7 +1161,10 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     A = chs_df.apply(lambda x : x.areas if len(x.areas)>0 else ['unknown area'], axis=1)
     chs_df['areas'] = A
     
-    return chs_df
+    # Return list of input paths:
+    ref_paths = [labeled_brain_areas_path, recording_coords_path]
+    
+    return chs_df, ref_paths
 
 
 
