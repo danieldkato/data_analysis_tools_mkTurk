@@ -137,6 +137,7 @@ def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, 
 def h5_2_ch_meta(h5path):
     zero_coords = pd.read_hdf(h5path, 'zero_coordinates')
     imro_tbl = pd.read_hdf(h5path, 'imro_table')
+    imro_tbl['ch_idx_glx'] = imro_tbl.index
     
     # Assign monkey and date if possible:
     trial_df = pd.read_hdf(h5path, 'trial_params_short')
