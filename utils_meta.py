@@ -8,6 +8,7 @@ from natsort import os_sorted
 import pickle
 import json
 from data_analysis_tools_mkTurk.utils_mkturk import * 
+from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
     # given the base data path, monkey, and date,
