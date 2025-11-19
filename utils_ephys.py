@@ -1,6 +1,8 @@
 import pickle
 import numpy as np
 import math
+from natsort import os_sorted
+import pathlib as Path
 
 def load_data(n_chan,MUA_dir):
     # loads spike times, peak values of detected spikes, waveform 
@@ -148,3 +150,23 @@ def get_data_bl(n_chan, MUA_dir, data_dict_path,stim_info_path, t_before = 0.2, 
         ch_psth_bl_stim[stim] = ch_psth_bl[stim_info_sess[stim]['stim_ind']]
 
     return ch_psth_bl, ch_psth_bl_meta,ch_psth_bl_stim
+
+
+
+def get_psth_byscenefile_allchans(save_out_path):
+    psth = pickle.load(open(os_sorted(save_out_path.glob('ch{:0>3d}_psth_scenefile'.format(0)))[0],'rb'))
+    scenefile_unique = list(psth.keys())
+    print(scenefile_unique)
+
+    n_chans = 384
+    # Concatenate all channels per scenefile 
+    for s in scenefile_unique:
+        psth_all = []
+        for n in range(n_chans):
+            psth = pickle.load(open(os_sorted(save_out_path.glob('ch{:0>3d}_psth_scenefile'.format(n)))[0],'rb'))
+            if type(psth[s]) != dict:
+                psth_mean = np.nanmean(psth[s], axis = 0)
+                psth_all.append(psth_mean)
+
+        psth_new = np.vstack(psth_all)
+        pickle.dump(psth_new, open(save_out_path / ('psth_' + Path.Path(s).stem),'wb'),protocol = 2)
