@@ -772,6 +772,12 @@ def df_2_img_full_paths(df, base_data_directory=os.path.join('/', 'mnt', 'smb', 
         curr_im_path_df['scenefile'] = sfiles_df.iloc[s].scenefile
         im_path_df = pd.concat([im_path_df, curr_im_path_df], axis=0)
 
+    # Go back and grab scenefiles, image indices for any scene where images were not found:
+    files_not_found_sfiles = sfiles_df[np.array([x is None for x in saved_imgs_directories])]
+    files_not_found_imgs = pd.merge(df[['monkey', 'date', 'scenefile', 'scenefile_img_idx']].drop_duplicates(), files_not_found_sfiles, on=['monkey', 'scenefile'])
+    files_not_found_imgs['img_full_path'] = None
+    im_path_df = pd.concat([im_path_df, files_not_found_imgs], axis=0)
+
     # Reorder columns, rows:
     im_path_df = im_path_df[['monkey', 'scenefile', 'scenefile_img_idx', 'img_full_path']]
     im_path_df = im_path_df.sort_values(by=['monkey', 'scenefile', 'scenefile_img_idx'])
