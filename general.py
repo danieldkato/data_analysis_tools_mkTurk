@@ -1503,3 +1503,23 @@ def fold_merge(dfs, merge_cols):
         df_out = pd.merge(dfs[0], fold_merge(dfs[1:], merge_cols=merge_cols), on=merge_cols, how='outer')
 
     return df_out
+
+
+
+def merge_duplicate_columns(df, output_colname, colname_pattern=None):
+
+    df_out = df.copy()
+    
+    # Define default regular expression to match column names to:  
+    if colname_pattern is None:
+        colname_pattern = output_colname
+
+    # Consolidate values of all regex-matching columns into list:
+    matching_cols = [x for x in df.columns if re.search(colname_pattern, x) is not None]
+    X = df.apply(lambda x : [val for val in list(x[matching_cols]) if val is not None and ~np.isnan(val)], axis=1)
+    df_out[output_colname] = X
+
+    # Eliminate individual regex-matching columns:
+    df_out = df_out.drop(columns=matching_cols)
+    
+    return df_out
