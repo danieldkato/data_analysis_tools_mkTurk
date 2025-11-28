@@ -1452,3 +1452,24 @@ def reformat_date(date_in):
 
 
 
+def find_sess_data_folders(data_root=Path.Path(os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'Data')),
+    monkeys = ['West', 'Bourgeois']):
+    
+    sess_df = pd.DataFrame()
+    for monkey in monkeys:
+    
+        curr_monkey_df = pd.DataFrame()
+        folders = os.listdir(os.path.join(data_root, monkey))
+        sess_regex = monkey + '_\d{8}'
+        sess_folders = np.sort([folder for folder in folders if re.search(sess_regex, folder) is not None])
+        sess_folders_full = [os.path.join(data_root, monkey, sess_folder) for sess_folder in sess_folders]
+        dates = [re.search('\d{8}', folder).group() for folder in sess_folders]
+        curr_monkey_df['date'] = dates
+        curr_monkey_df['sess_folder_raw'] = sess_folders_full
+        curr_monkey_df.loc[:, 'monkey'] = monkey
+        sess_df = pd.concat([sess_df, curr_monkey_df], axis=0)
+    
+    sess_df = sess_df[['monkey', 'date', 'sess_folder_raw']]
+    sess_df = sess_df.sort_values(by=['monkey', 'date', 'sess_folder_raw'])
+    
+    return sess_df
