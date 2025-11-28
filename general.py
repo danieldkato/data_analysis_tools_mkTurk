@@ -1477,6 +1477,23 @@ def find_sess_data_folders(data_root=Path.Path(os.path.join('/', 'mnt', 'smb', '
 
 
 def fold_merge(dfs, merge_cols):
+    """
+    Merge a list of two or more dataframes.
+    
+    Parameters
+    ----------
+    dfs : List
+        List of dataframes to merge.
+        
+    merge_cols : str | list
+        Name of colums or columns to merge on.
+
+    Returns
+    -------
+    df_out : pandas.core.frame.DataFrame
+        Merged dataframe.
+
+    """
     
     if len(dfs) == 1:
         df_out = dfs[0]
