@@ -1473,3 +1473,16 @@ def find_sess_data_folders(data_root=Path.Path(os.path.join('/', 'mnt', 'smb', '
     sess_df = sess_df.sort_values(by=['monkey', 'date', 'sess_folder_raw'])
     
     return sess_df
+
+
+
+def fold_merge(dfs, merge_cols):
+    
+    if len(dfs) == 1:
+        df_out = dfs[0]
+    elif len(dfs) == 2:
+        df_out =  pd.merge(dfs[0], dfs[1], on=merge_cols, how='outer')
+    elif len(dfs) > 2:
+        df_out = pd.merge(dfs[0], fold_merge(dfs[1:], merge_cols=merge_cols), on=merge_cols, how='outer')
+
+    return df_out
