@@ -1258,7 +1258,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
 
 
-def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'), flt=None):
+def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'), flt=None):
     """
     Read 'recording coordinate data'  spreadsheet, which includes AG's area labels for 
     recording sessions from West spanning 20231017 to 20240325.
