@@ -1464,13 +1464,15 @@ def find_sess_data_folders(data_root=Path.Path(os.path.join('/', 'mnt', 'smb', '
         sess_folders = np.sort([folder for folder in folders if re.search(sess_regex, folder) is not None])
         sess_folders_full = [os.path.join(data_root, monkey, sess_folder) for sess_folder in sess_folders]
         dates = [re.search('\d{8}', folder).group() for folder in sess_folders]
+        PXX = [int(re.search('\_P\d{2}', folder).group()[2:4]) for folder in sess_folders]
         curr_monkey_df['date'] = dates
-        curr_monkey_df['sess_folder_raw'] = sess_folders_full
+        curr_monkey_df['PXX'] = PXX
+        curr_monkey_df['path'] = sess_folders_full
         curr_monkey_df.loc[:, 'monkey'] = monkey
         sess_df = pd.concat([sess_df, curr_monkey_df], axis=0)
     
-    sess_df = sess_df[['monkey', 'date', 'sess_folder_raw']]
-    sess_df = sess_df.sort_values(by=['monkey', 'date', 'sess_folder_raw'])
+    sess_df = sess_df[['monkey', 'date', 'PXX', 'path']]
+    sess_df = sess_df.sort_values(by=['monkey', 'date', 'PXX', 'path'])
     
     return sess_df
 
@@ -1513,10 +1515,14 @@ def merge_duplicate_columns(df, output_colname, colname_pattern=None):
     # Define default regular expression to match column names to:  
     if colname_pattern is None:
         colname_pattern = output_colname
-
-    # Consolidate values of all regex-matching columns into list:
+    
+    # Replace nan with None:
     matching_cols = [x for x in df.columns if re.search(colname_pattern, x) is not None]
-    X = df.apply(lambda x : [val for val in list(x[matching_cols]) if val is not None and ~np.isnan(val)], axis=1)
+    for col in matching_cols:
+        df[col] = df[col].replace(np.nan, None)
+    
+    # Consolidate values of all regex-matching columns into list:
+    X = df.apply(lambda x : [val for val in list(x[matching_cols]) if val is not None], axis=1)
     df_out[output_colname] = X
 
     # Eliminate individual regex-matching columns:
