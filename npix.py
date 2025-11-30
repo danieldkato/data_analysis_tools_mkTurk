@@ -1258,6 +1258,28 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
     
 
 
+def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'), 
+    monkeys=['West', 'Bourgeois'], flt=None):
+    
+    # Iterate over sheets (monkeys):
+    df = pd.DataFrame()
+    for monkey in monkeys:
+        curr_sheet = pd.read_excel(path, sheet_name=monkey)
+        curr_sheet['monkey'] = monkey
+        df = pd.concat([df, curr_sheet], axis=0)
+    
+    # Convert dates from mm/dd/yyyy to yyyymmdd:
+    df['dateparts'] = df.apply(lambda x : x.date.split('/') if type(x.date)==str else None, axis=1)
+    df['date'] = df.apply(lambda x : ''.join([x.dateparts[2].zfill(4), x.dateparts[0].zfill(2), x.dateparts[1].zfill(2)]) if x.dateparts is not None else None, axis=1)
+    df = df.drop(columns='dateparts')
+    
+    # Order by monkey and date:
+    df = df.sort_values(by=['monkey', 'date'])
+    
+    return df
+    
+
+
 def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'), flt=None):
     """
     Read 'recording coordinate data'  spreadsheet, which includes AG's area labels for 
