@@ -1117,7 +1117,7 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
     
     # Read separate Google sheets workbooks:
     wkbka_df = read_labeled_brain_areas_sheet(labeled_brain_areas_path, flt=flt) # Read workbook entitled 'labeled brain areas'
-    wkbkb_df = read_recording_coordinate_data_sheet(recording_coords_path, flt=flt) # Read workbook entitled 'recording coordinate data'
+    wkbkb_df = read_recording_coordinate_data_areas(recording_coords_path, flt=flt) # Read workbook entitled 'recording coordinate data'
 
     """
     # Exclude rows with no area labels:
