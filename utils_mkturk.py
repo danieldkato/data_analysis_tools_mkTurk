@@ -3,7 +3,6 @@ import json
 import math
 import numpy as np
 import pathlib as Path 
-import warnings
 
 def getLongestArray(x):
     # getting number of trials from 
@@ -46,7 +45,7 @@ def gen_scene_df(scenefile):
     except:
         n_scenes = getLongestArray(scenefile)
     
-    columns = ['type','size', 'posX', 'posY', 'posZ', 'targetX', 'targetY', 'targetZ', 'rotX', 'rotY', 'rotZ', 'visibility', 'filterVal', 'meta', 'dur']
+    columns = ['type', 'size', 'posX', 'posY', 'posZ', 'targetX', 'targetY', 'targetZ', 'rotX', 'rotY', 'rotZ', 'visibility','filterVal', 'meta', 'dur']
     # columns are properties of objects
 
     # rows are objects in a scene, including lights and background if they exist 
@@ -95,7 +94,7 @@ def gen_scene_df(scenefile):
         # CAMERAS
         cam_df = pd.DataFrame(index = all_cam_ids,columns = columns)
         for cam in all_cam_ids:
-            cam_df.loc[cam]['type'] = 'camera'
+            cam_df.loc[cam,'type'] = 'camera'
             # posititon
             posX = scenefile["CAMERAS"][cam]["position"]['x']
 
@@ -118,9 +117,9 @@ def gen_scene_df(scenefile):
             except:
                 posZ = posZ[0]
 
-            cam_df.loc[cam]['posX'] = posX
-            cam_df.loc[cam]['posY'] = posY
-            cam_df.loc[cam]['posZ'] = posZ
+            cam_df.loc[cam,'posX'] = posX
+            cam_df.loc[cam,'posY'] = posY
+            cam_df.loc[cam,'posZ'] = posZ
 
             # target
             try: 
@@ -153,22 +152,22 @@ def gen_scene_df(scenefile):
             except:
                 targetZ = targetZ[0]
 
-            cam_df.loc[cam]['targetX'] = targetX
-            cam_df.loc[cam]['targetY'] = targetY
-            cam_df.loc[cam]['targetZ'] = targetZ
+            cam_df.loc[cam,'targetX'] = targetX
+            cam_df.loc[cam,'targetY'] = targetY
+            cam_df.loc[cam,'targetZ'] = targetZ
 
              # visibility
             try:
-                cam_df.loc[cam]['visibility'] = scenefile['CAMERAS'][cam]['visible'][n_s]
+                cam_df.loc[cam,'visibility'] = scenefile['CAMERAS'][cam]['visible'][n_s]
             except:
-                cam_df.loc[cam]['visibility'] = scenefile['CAMERAS'][cam]['visible'][0]
+                cam_df.loc[cam,'visibility'] = scenefile['CAMERAS'][cam]['visible'][0]
                 
 
         # OBJECTS
         obj_df = pd.DataFrame(index = all_obj_ids, columns = columns)
         
         for obj in all_obj_ids:
-            obj_df.loc[obj]['type'] = 'object'
+            obj_df.loc[obj,'type'] = 'object'
             # size
             try: 
                 size = scenefile["OBJECTS"][obj]["sizeTHREEJS"]
@@ -180,7 +179,7 @@ def gen_scene_df(scenefile):
             except:
                 size = size[0]
 
-            obj_df.loc[obj]['size'] = size
+            obj_df.loc[obj,'size'] = size
 
             # posititon
             try:
@@ -214,9 +213,9 @@ def gen_scene_df(scenefile):
                 posZ = posZ[0]
 
 
-            obj_df.loc[obj]['posX'] = posX
-            obj_df.loc[obj]['posY'] = posY
-            obj_df.loc[obj]['posZ'] = posZ
+            obj_df.loc[obj,'posX'] = posX
+            obj_df.loc[obj,'posY'] = posY
+            obj_df.loc[obj,'posZ'] = posZ
 
             # rotation
 
@@ -241,24 +240,30 @@ def gen_scene_df(scenefile):
             except:
                 rotZ = rotZ[0]
 
-            obj_df.loc[obj]['rotX'] = rotX
-            obj_df.loc[obj]['rotY'] = rotY
-            obj_df.loc[obj]['rotZ'] = rotZ
+            obj_df.loc[obj,'rotX'] = rotX
+            obj_df.loc[obj,'rotY'] = rotY
+            obj_df.loc[obj,'rotZ'] = rotZ
 
             # visibility
             try:
-                obj_df.loc[obj]['visibility'] = scenefile['OBJECTS'][obj]['visible'][n_s]
+                obj_df.loc[obj,'visibility'] = scenefile['OBJECTS'][obj]['visible'][n_s]
             except:
-                obj_df.loc[obj]['visibility'] = scenefile['OBJECTS'][obj]['visible'][0]
+                obj_df.loc[obj,'visibility'] = scenefile['OBJECTS'][obj]['visible'][0]
             # meta
 
-            obj_df.loc[obj]['meta'] = scenefile['OBJECTS'][obj]['meshpath']
+            obj_df.loc[obj,'meta'] = scenefile['OBJECTS'][obj]['meshpath']
+
+            # texture
+            try: 
+                obj_df.loc[obj,'filterVal'] = scenefile['OBJECTS'][obj]['texture']
+            except:
+                continue
         
         # LIGHT
         light_df = pd.DataFrame(index = all_light_ids, columns = columns)
         
         for light in all_light_ids:
-            light_df.loc[light]['type'] = 'light'
+            light_df.loc[light,'type'] = 'light'
             # posititon
             posX = scenefile["LIGHTS"][light]["position"]['x']
 
@@ -281,15 +286,15 @@ def gen_scene_df(scenefile):
             except:
                 posZ = posZ[0]
 
-            light_df.loc[light]['posX'] = posX
-            light_df.loc[light]['posY'] = posY
-            light_df.loc[light]['posZ'] = posZ
+            light_df.loc[light,'posX'] = posX
+            light_df.loc[light,'posY'] = posY
+            light_df.loc[light,'posZ'] = posZ
 
             # visibility 
             try:
-                light_df.loc[light]['visibility'] = scenefile['LIGHTS'][light]['visible'][n_s]
+                light_df.loc[light,'visibility'] = scenefile['LIGHTS'][light]['visible'][n_s]
             except:
-                light_df.loc[light]['visibility'] = scenefile['LIGHTS'][light]['visible'][0]
+                light_df.loc[light,'visibility'] = scenefile['LIGHTS'][light]['visible'][0]
 
             
         # BACKGROUND
@@ -298,53 +303,59 @@ def gen_scene_df(scenefile):
 
         if len(all_bkg_ids) != 0: # background is present in the scenefile
             for bkg_id in all_bkg_ids:
-                bkg_df.loc[bkg_id]['type'] = 'background'
+                bkg_df.loc[bkg_id,'type'] = 'background'
             if n_s <len(bkg_new):
                 if bkg_new[n_s] != -1:
-                    try: 
-                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = scenefile['IMAGES']['visible'][n_s]
-                    except:
-                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['visibility'] = scenefile['IMAGES']['visible'][0]
-
-                    bkg_df.loc['bkg' + str(bkg_new[n_s])]['meta'] = scenefile['IMAGES']['imagebag']
+                    if 'visible' in scenefile['IMAGES']:
+                        try: 
+                            bkg_df.loc['bkg' + str(bkg_new[n_s]),'visibility'] = scenefile['IMAGES']['visible'][n_s]
+                        except:
+                            bkg_df.loc['bkg' + str(bkg_new[n_s]),'visibility'] = scenefile['IMAGES']['visible'][0]
+                    else:
+                         bkg_df.loc['bkg' + str(bkg_new[n_s]),'visibility'] = 1
+                        
+                    bkg_df.loc['bkg' + str(bkg_new[n_s]),'meta'] = scenefile['IMAGES']['imagebag']
                     try:
-                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
+                        bkg_df.loc['bkg' + str(bkg_new[n_s]),'size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
                     except:
-                        bkg_df.loc['bkg' + str(bkg_new[n_s])]['size'] = scenefile['IMAGES']['sizeInches'][0] 
+                        bkg_df.loc['bkg' + str(bkg_new[n_s]),'size'] = scenefile['IMAGES']['sizeInches'][0] 
 
         if len(all_bkg_ids) == 1: # background applies to all scenes 
             if bkg_new[0] != -1:
-                try: 
-                    bkg_df.loc['bkg' + str(bkg_new[0])]['visibility'] = scenefile['IMAGES']['visible'][n_s]
-                except:
-                     bkg_df.loc['bkg' + str(bkg_new[0])]['visibility'] = scenefile['IMAGES']['visible'][0]
-                     
-                bkg_df.loc['bkg' + str(bkg_new[0])]['meta'] = scenefile['IMAGES']['imagebag']
+                if 'visible' in scenefile['IMAGES']:
+                    try: 
+                        bkg_df.loc['bkg' + str(bkg_new[0]),'visibility'] = scenefile['IMAGES']['visible'][n_s]
+                    except:
+                        bkg_df.loc['bkg' + str(bkg_new[0]),'visibility'] = scenefile['IMAGES']['visible'][0]
+                else:
+                    bkg_df.loc['bkg' + str(bkg_new[0]),'visibility'] = 1
+                bkg_df.loc['bkg' + str(bkg_new[0]),'meta'] = scenefile['IMAGES']['imagebag']
                 try:
-                    bkg_df.loc['bkg' + str(bkg_new[0])]['size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
+                    bkg_df.loc['bkg' + str(bkg_new[0]),'size'] = scenefile['IMAGES']['sizeTHREEJS'][0] 
                 except:
-                    bkg_df.loc['bkg' + str(bkg_new[0])]['size'] = scenefile['IMAGES']['sizeInches'][0] 
+                    bkg_df.loc['bkg' + str(bkg_new[0]),'size'] = scenefile['IMAGES']['sizeInches'][0] 
 
 
         # IMAGEFILTERS 
         imgf_df = pd.DataFrame(index = all_imgf_ids, columns = columns)
         for imgf in all_imgf_ids:
-            imgf_df.loc[imgf]['type'] = 'imgFilter'
+            imgf_df.loc[imgf,'type'] = 'imgFilter'
             if len(scenefile['IMAGEFILTERS'][imgf.split('_')[1]]) > 0:
                 try: 
-                    imgf_df.loc[imgf]['filterVal']= scenefile['IMAGEFILTERS'][imgf.split('_')[1]][n_s]
+                    imgf_df.loc[imgf,'filterVal']= scenefile['IMAGEFILTERS'][imgf.split('_')[1]][n_s]
                 except:
-                    imgf_df.loc[imgf]['filterVal']= scenefile['IMAGEFILTERS'][imgf.split('_')[1]][0]                
+                    imgf_df.loc[imgf,'filterVal']= scenefile['IMAGEFILTERS'][imgf.split('_')[1]][0]   
+                             
 
         # OBJECTFILTERS
         objf_df = pd.DataFrame(index = all_objf_ids, columns = columns)
         for objf in all_objf_ids:
-            objf_df.loc[objf]['type'] = 'objFilter'
+            objf_df.loc[objf,'type'] = 'objFilter'
             if len(scenefile['OBJECTFILTERS'][objf.split('_')[1]]) > 0:
                 try:
-                    objf_df.loc[objf]['filterVal']= scenefile['OBJECTFILTERS'][objf.split('_')[1]][n_s]
+                    objf_df.loc[objf,'filterVal']= scenefile['OBJECTFILTERS'][objf.split('_')[1]][n_s]
                 except:
-                    objf_df.loc[objf]['filterVal']= scenefile['OBJECTFILTERS'][objf.split('_')[1]][0]
+                    objf_df.loc[objf,'filterVal']= scenefile['OBJECTFILTERS'][objf.split('_')[1]][0]
 
                 
         all_df = pd.concat((cam_df, obj_df,light_df,bkg_df, imgf_df,objf_df))
@@ -373,7 +384,6 @@ def create_data_mat(file):
         n_rsvp = max(m['TASK']['NRSVP'], m['TASK']['NRSVPMax'])
     else:
         n_rsvp = m['TASK']['NRSVP'] 
-    
     n_trials_prepared= len(m['TRIALEVENTS']['Sample']['0'])
 
     n_stims = n_rsvp * n_trials_prepared
@@ -427,83 +437,58 @@ def gen_short_scene_info(scene_df):
     # object , background then camera
     scene_df_short = ''
     for obj in visible_objs:
-        if scene_df.loc[obj]['type'] == 'object':
-            str_ = scene_df.loc[obj]['meta'].split('/')
+        if scene_df.loc[obj,'type'] == 'object':
+            str_ = scene_df.loc[obj,'meta'].split('/')
             obj_name = str_[len(str_)-2] + '/' + str_[len(str_)-1]
             if scene_df_short != '':
                 obj_name = '_' + obj_name 
                 
-            scene_df_short = scene_df_short + obj_name + '_sz_' + str(scene_df.loc[obj]['size']) +\
-            '_posX_' + str(scene_df.loc[obj]['posX']) + '_posY_' + str(scene_df.loc[obj]['posY']) + \
-            '_posZ_' +  str(scene_df.loc[obj]['posZ']) + '_rotX_' + str(scene_df.loc[obj]['rotX']) + \
-            '_rotY_' + str(scene_df.loc[obj]['rotY']) + '_rotZ_' + str(scene_df.loc[obj]['rotZ']) 
+            scene_df_short = scene_df_short + obj_name + '_sz_' + str(scene_df.loc[obj,'size']) +\
+            '_posX_' + str(scene_df.loc[obj,'posX']) + '_posY_' + str(scene_df.loc[obj,'posY']) + \
+            '_posZ_' +  str(scene_df.loc[obj,'posZ']) + '_rotX_' + str(scene_df.loc[obj,'rotX']) + \
+            '_rotY_' + str(scene_df.loc[obj,'rotY']) + '_rotZ_' + str(scene_df.loc[obj,'rotZ']) 
+
+            if scene_df.loc[obj,'filterVal'] == 'false':
+                scene_df_short = scene_df_short + '_notexture'
+
     for obj in visible_objs:
-        if scene_df.loc[obj]['type'] == 'background':
-            str_ = scene_df.loc[obj]['meta'].split('/')
+        if scene_df.loc[obj,'type'] == 'background':
+            str_ = scene_df.loc[obj,'meta'].split('/')
             obj_name = str_[len(str_)-2] + '/' + str_[len(str_)-1]
             if scene_df_short != '':
                 obj_name = '_' + obj_name
             scene_df_short = scene_df_short + obj_name + obj.split('bkg')[1] + \
-            '_sz_' + str(scene_df.loc[obj]['size']) 
+            '_sz_' + str(scene_df.loc[obj,'size']) 
 
     for obj in visible_objs:
-        if scene_df.loc[obj]['type'] == 'light':
+        if scene_df.loc[obj,'type'] == 'light':
             obj_name = obj
             if scene_df_short != '':
                 obj_name = '_' + obj_name
             scene_df_short = scene_df_short + obj_name +\
-            '_posX_' + str(scene_df.loc[obj]['posX']) + '_posY_' + str(scene_df.loc[obj]['posY']) + \
-            '_posZ_' +  str(scene_df.loc[obj]['posZ'])
+            '_posX_' + str(scene_df.loc[obj,'posX']) + '_posY_' + str(scene_df.loc[obj,'posY']) + \
+            '_posZ_' +  str(scene_df.loc[obj,'posZ'])
 
     for obj in visible_objs:
-        if scene_df.loc[obj]['type'] == 'camera':
+        if scene_df.loc[obj,'type'] == 'camera':
             obj_name = obj
             if scene_df_short != '':
                 obj_name = '_' + obj_name
             scene_df_short = scene_df_short + obj_name +\
-            '_posX_' + str(scene_df.loc[obj]['posX']) + '_posY_' + str(scene_df.loc[obj]['posY']) + \
-            '_posZ_' +  str(scene_df.loc[obj]['posZ']) + '_targetX_' + str(scene_df.loc[obj]['targetX']) + \
-            '_targetY_' + str(scene_df.loc[obj]['targetY']) + '_targetZ_' + str(scene_df.loc[obj]['targetZ']) 
+            '_posX_' + str(scene_df.loc[obj,'posX']) + '_posY_' + str(scene_df.loc[obj,'posY']) + \
+            '_posZ_' +  str(scene_df.loc[obj,'posZ']) + '_targetX_' + str(scene_df.loc[obj,'targetX']) + \
+            '_targetY_' + str(scene_df.loc[obj,'targetY']) + '_targetZ_' + str(scene_df.loc[obj,'targetZ']) 
 
     imgFilter = scene_df[(scene_df['filterVal'].notna()) & (scene_df['filterVal'] != "")].index
-    for imgF in imgFilter:
-        imgF_name = imgF
-        if scene_df_short != '':
-            imgF_name = '_' + imgF
-        scene_df_short = scene_df_short + imgF_name + '_' + str(scene_df.loc[imgF]['filterVal'])
+    if len(imgFilter) > 0:
+        for imgF in imgFilter:
+            if scene_df.loc[imgF,'type'] == 'imgFilter' or scene_df.loc[imgF,'type'] == 'objFilter':
+                imgF_name = imgF
+                if scene_df_short != '':
+                    imgF_name = '_' + imgF
+                scene_df_short = scene_df_short + imgF_name + '_' + str(scene_df.loc[imgF,'filterVal'])
+
+    scene_df_short = scene_df_short + '_dur' + str(scene_df['dur'].iloc[0])
 
     return scene_df_short
 
-def expand_sess_scenefile2stim(scenefile_meta, scenefiles):
-    """
-    Returns union of all stim_ids associated with any in a list of scenefiles.
-
-    Parameters
-    ----------
-    scenefile_meta : dict
-        Same format as dict encoded by 'ch<ccc>_scenefile_meta' files in 
-        preprocessed data directories.
-        
-    scenefiles : list
-        List of scenefiles to expand.
-
-    Returns
-    -------
-    stim_ids : TYPE
-        DESCRIPTION.
-
-    """
-    
-    stim_ids = []
-    for sf in scenefiles:
-        stim_conds = scenefile_meta[sf]['stim_ids']      
-        stim_ids.append(stim_conds)
-    
-    # Raise a warning if there is overlap in stim_ids included in different
-    # scenefiles in current class:
-    if not len(stim_ids) == len(np.unique(stim_ids)):
-        warnings.warn('Overlapping stim_ids between scenefiles in current class.')
-    
-    stim_ids = np.unique(stim_ids)
-    
-    return stim_ids

@@ -1,0 +1,46 @@
+diff --git a/IO.py b/IO.py
+index cdb5f46..6062ec3 100644
+--- a/IO.py
++++ b/IO.py
+@@ -108,11 +108,18 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
+     recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split(os.sep)[-1]
+     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
+     sess_meta_df = sess_meta_dict_2_df(sess_meta)
+-    stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
++    #stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
+     data_dict_path = os.path.join(preprocessed_data_path, 'data_dict_' + recording_dir)
+     data_dicts = pickle.load(open(data_dict_path, 'rb'))
+     D = [data_dicts[x] for x in np.arange(len(data_dicts))]
+         
++    # Create dataframe of all trial parameters: 
++    trial_params_df = session_dicts_2_df(D)
++    n_rows = trial_params_df.shape[0]
++    trial_params_df['idx_merge'] = np.arange(n_rows)
++    trial_params_df = trial_params_df.set_index('idx_merge')
++    stim_ids = trial_params_df.stim_id.unique()
++    
+     # Find widest range of PSTH bins (these can differ between stimulus 
+     # within a session conditions)
+     n_bins_per_stim = [stim_meta[x]['n_bins'] for x in stim_ids]
+@@ -121,12 +128,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
+     example_long_stim = stim_ids[longest_stim[0][0]]
+     psth_bins = stim_meta[example_long_stim]['psth_bins']    
+     
+-    # Create dataframe of all trial parameters: 
+-    trial_params_df = session_dicts_2_df(D)
+-    n_rows = trial_params_df.shape[0]
+-    trial_params_df['idx_merge'] = np.arange(n_rows)
+-    trial_params_df = trial_params_df.set_index('idx_merge')
+-    
+     # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
+     # m images, then index of first image of scenefile b will be m, not 0:
+     offsets_df = trial_params_df[['scenefile', 'stim_idx']].groupby('scenefile').min().reset_index()
+@@ -234,7 +235,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
+         fullpath = os.path.join(preprocessed_data_path, stim_fname)
+         curr_ch_dict = pickle.load(open(fullpath,'rb')) 
+         input_files.append(fullpath)
+-            
++        
+         # Iterate over stimulus conditions:
+         for sx, stim_id in enumerate(stim_ids):
+             
