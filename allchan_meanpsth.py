@@ -72,3 +72,8 @@ def allchan_meanpsth(monkey: str, date: str):
                 mean_psth_stim[ch,:] = np.load(file_lists[ch])
 
             np.save(save_out_path / 'mean_psth_allchan.npy', mean_psth_stim)
+
+if __name__ == "__main__":
+    monkey = sys.argv[2]
+    date = str(sys.argv[3])
+    allchan_meanpsth(monkey, date)

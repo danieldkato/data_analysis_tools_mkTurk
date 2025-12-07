@@ -134,3 +134,7 @@ def allchan_objaverse(monkey: str, date: str):
         if not np.isnan(FSI_concat['sophie']).all():
             fig = get_FSI_heatmap(FSI_concat, FSI, plot_save_out_path, 'sophie', chanmap)
 
+if __name__ == "__main__":
+    monkey = sys.argv[2]
+    date = str(sys.argv[3])
+    allchan_objaverse(monkey, date)

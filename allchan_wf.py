@@ -79,3 +79,8 @@ def allchan_wf(monkey: str, date: str):
             spike_height_all[n_chan,0:len(spike_height)] = spike_height
 
         np.savez(save_out_path / 'wf_features.npz', spike_dur = spike_dur_all,pt_ratio = pt_ratio_all, spike_height = spike_height_all)
+        
+if __name__ == "__main__":
+    monkey = sys.argv[2]
+    date = str(sys.argv[3])
+    allchan_wf(monkey, date)

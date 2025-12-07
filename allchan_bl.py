@@ -92,3 +92,8 @@ def allchan_bl(monkey: str, date: str):
         plt.title('mean baseline activity per channel \n(-200ms to the onset of trial)')
         plt.ylabel ('FR (spikes / sec)')
         fig.savefig(plot_save_out_path / 'baseline activity across channels.png', bbox_inches = 'tight')
+
+if __name__ == "__main__":
+    monkey = sys.argv[2]
+    date = str(sys.argv[3])
+    allchan_bl(monkey, date)

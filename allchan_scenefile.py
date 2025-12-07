@@ -64,3 +64,8 @@ def allchan_scenefile(monkey: str, date: str):
         get_psth_byscenefile_allchans(save_out_path)
             
         gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap)
+
+if __name__ == "__main__":
+    monkey = sys.argv[2]
+    date = str(sys.argv[3])
+    allchan_scenefile(monkey, date)
