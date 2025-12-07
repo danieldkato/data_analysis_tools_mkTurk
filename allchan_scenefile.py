@@ -1,42 +1,66 @@
 from natsort import os_sorted
 import pickle
-import pathlib as Path
+from pathlib import Path
 import os
 import sys
 import numpy as np
-from utils_ephys import * 
-from utils_meta import * 
-from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta
+from utils_ephys import get_psth_byscenefile_allchans, gen_heatmap_byscenefile
+from utils_meta import init_dirs, get_chanmap
+from make_engram_path import ENGRAM_PATH
 
-engram_path = Path.Path('/mnt/smb/locker/issa-locker')
 
-base_data_path = engram_path / 'Data'
-base_save_out_path = engram_path / 'users/Younah/ephys'
+def allchan_scenefile(monkey: str, date: str):
+    """
+    Generate PSTH heatmaps for all channels organized by scene file.
+    
+    This function processes electrophysiology data for a given monkey and date, organizing
+    the analysis by scene files across all recording channels. It initializes data paths,
+    loads channel mapping and stimulus information, then generates PSTH (Peri-Stimulus Time Histogram)
+    data and corresponding heatmaps for each session.
+    
+    Args:
+        monkey: Identifier for the monkey subject (e.g., 'monkey1', 'monkey2').
+        date: Recording date in string format.
+    
+    Notes:
+        - Requires stim_info_sess files to exist in the save_out_path directories
+        - Will attempt to load existing chanmap.npy or generate it from imroTbl if not found
+        - Skips sessions without stim_info_sess unless it's the last session (exits with error)
+        - Uses global ENGRAM_PATH for base data and output directories
+        - Output files are saved to user-specific ephys directory under ENGRAM_PATH
+    
+    Raises:
+        SystemExit: If stim_info_sess file doesn't exist for the last session in data_path_list.
+    """
 
-monkey = sys.argv[2]
-date = str(sys.argv[3])
-print(date)
+    base_data_path = ENGRAM_PATH / 'Data'
+    base_save_out_path = ENGRAM_PATH / 'users/Younah/ephys'
 
-data_path_list, save_out_path_list, plot_save_out_path_list = init_dirs(base_data_path, monkey, date, base_save_out_path)
+    print(date)
 
-for n,(data_path, save_out_path, plot_save_out_path) in enumerate(zip(data_path_list, save_out_path_list, plot_save_out_path_list)):
-    print(data_path)
-    try: 
-        stim_info_path= os_sorted(save_out_path.glob('stim_info_sess'))[0]
-    except:
-        if n == len(data_path_list) -1:
-            sys.exit('stim info path doesn''t exist')
-        else:
-            continue
+    data_path_list, save_out_path_list, plot_save_out_path_list = init_dirs(base_data_path, monkey, date, base_save_out_path)
 
-    print(stim_info_path)
-    print('\nstim info sess found: ' + str(stim_info_path.exists()))
+    for n,(data_path, save_out_path, plot_save_out_path) in enumerate(zip(data_path_list, save_out_path_list, plot_save_out_path_list)):
+        data_path = Path(data_path)
+        save_out_path = Path(save_out_path)
+        plot_save_out_path = Path(plot_save_out_path)
+        print(data_path)
+        try: 
+            stim_info_path= os_sorted(save_out_path.glob('stim_info_sess'))[0]
+        except:
+            if n == len(data_path_list) -1:
+                sys.exit('stim info path doesn''t exist')
+            else:
+                continue
 
-    try: 
-        chanmap = np.load(save_out_path / 'chanmap.npy')
-    except:
-        chanmap, imroTbl = get_chanmap(data_path)
+        print(stim_info_path)
+        print('\nstim info sess found: ' + str(stim_info_path.exists()))
 
-    get_psth_byscenefile_allchans(save_out_path)
-        
-    gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap)
+        try: 
+            chanmap = np.load(save_out_path / 'chanmap.npy')
+        except:
+            chanmap, imroTbl = get_chanmap(data_path)
+
+        get_psth_byscenefile_allchans(save_out_path)
+            
+        gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap)
