@@ -12,7 +12,7 @@ from utils_meta import init_dirs
 import matplotlib
 from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
-def get_wf_features(monkey: str, date: str):
+def get_wf_features(n_chan: int, monkey: str, date: str):
     """
     Extract waveform features from multi-unit activity (MUA) data for a specific channel.
     This function loads spike waveform data, timestamps, peaks, and sign labels from processed
@@ -67,7 +67,6 @@ def get_wf_features(monkey: str, date: str):
             else:
                 continue
         ##############################################################################################################################################
-        n_chan = int(sys.argv[1])
         Fs = 30000
 
         MUA_dir = data_path / 'MUA_4SD'
@@ -167,6 +166,7 @@ def get_wf_features(monkey: str, date: str):
         # plt.savefig(plot_save_out_path / 'waveform' / 'ch{:0>3d}.png'.format(n_chan), bbox_inches = 'tight')
 
 if __name__ == "__main__":
+    n_chan = int(sys.argv[1])
     monkey = sys.argv[2]
     date = str(sys.argv[3])
-    get_wf_features(monkey, date)
+    get_wf_features(n_chan, monkey, date)

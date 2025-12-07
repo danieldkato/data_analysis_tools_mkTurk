@@ -15,7 +15,7 @@ from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta
 from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
-def get_psth_objaverse(monkey: str, date: str):
+def get_psth_objaverse(n_chan: int, monkey: str, date: str):
     """
     Calculate and visualize peri-stimulus time histograms (PSTH) for Objaverse stimuli.
     This function processes neural recording data for a specific monkey and date, computing
@@ -92,8 +92,6 @@ def get_psth_objaverse(monkey: str, date: str):
             imroTbl = read_imroTbl(meta)
         except:
             chanmap = np.load(save_out_path / 'chanmap.npy')
-
-        n_chan = int(sys.argv[1])
 
         # modify the channel map by channel mapping
         # this only affects plots not actual data
@@ -416,6 +414,7 @@ def get_psth_objaverse(monkey: str, date: str):
             print('done')
             
 if __name__ == '__main__':
+    n_chan = int(sys.argv[1])
     monkey = sys.argv[2]
     date = sys.argv[3]
-    get_psth_objaverse(monkey, date)
+    get_psth_objaverse(n_chan, monkey, date)
