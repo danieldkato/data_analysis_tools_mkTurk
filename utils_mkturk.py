@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import math
 import numpy as np
-import pathlib as Path 
+from pathlib import Path 
 
 def getLongestArray(x):
     # getting number of trials from 
@@ -37,7 +37,7 @@ def getLongestArray(x):
 
 def gen_scene_df(scenefile):
 
-    if isinstance(scenefile, str) or isinstance(scenefile, Path.Path): # if the user provided the path to the scenefile
+    if isinstance(scenefile, str) or isinstance(scenefile, Path): # if the user provided the path to the scenefile
         scenefile = json.load(open(scenefile,'rb'))
 
     try: 
@@ -400,7 +400,7 @@ def create_data_mat(file):
 
     for n in range(n_stims):
         data_dict[n] = dict.fromkeys(params, [])
-        data_dict[n]['behav_file'] = Path.Path(file).stem
+        data_dict[n]['behav_file'] = Path(file).stem
         data_dict[n]['trial_num'] = math.floor(n/n_rsvp)
         data_dict[n]['rsvp_num'] = n % n_rsvp
         data_dict[n]['stim_id'] = int(m['TRIALEVENTS']['Sample'][str(data_dict[n]['rsvp_num'])][data_dict[n]['trial_num']])

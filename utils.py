@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.io import loadmat
 import os
-import pathlib as Path
+from pathlib import Path
 import re
 #from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 

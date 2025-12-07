@@ -1,29 +1,20 @@
 # useful functions for code
-import socket
-import pathlib as Path
+from pathlib import Path
 from dataclasses import dataclass
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
-from utils_mkturk import * 
+from utils_mkturk import gen_scene_df, gen_short_scene_info
+from make_engram_path import ENGRAM_PATH
 
 def setup_paths():
     """Setup data paths based on hostname"""
-    host = socket.gethostname()
-    if 'rc.zi.columbia.edu' in host: 
-        engram_path = Path.Path('/mnt/smb/locker/issa-locker')
-    elif 'DESKTOP' in host:
-        engram_path = Path.Path('Z:/')
-    elif 'Younah' in host:
-        engram_path = Path.Path('/Volumes/issa-locker/')
-    else:
-        raise ValueError(f"Unknown host: {host}")
-    
-    base_data_path = engram_path / 'Data'   
-    base_save_out_path = engram_path / 'users/Younah/ephys'
 
-    return engram_path, base_data_path, base_save_out_path
+    base_data_path = ENGRAM_PATH / 'Data'
+    base_save_out_path = ENGRAM_PATH / 'users/Younah/ephys'
+
+    return ENGRAM_PATH, base_data_path, base_save_out_path
 
 @dataclass
 class Config:
@@ -88,7 +79,7 @@ def identify_visual_channels(mean_psth_data: np.ndarray, config: Config, psth_bi
     
     return ch_visual
 
-def get_time_centers(config, stim_dur: float) -> np.ndarray:
+def get_time_centers(config, stim_dur: float) -> tuple[np.ndarray, np.ndarray]:
         """Get time bin centers for plotting."""
         n_bins = int(np.ceil((stim_dur + config.t_before + config.t_after) 
                             / config.binwidth_psth))
@@ -98,7 +89,7 @@ def get_time_centers(config, stim_dur: float) -> np.ndarray:
 
         return psth_bins, bincents
 
-def load_meta_and_scene_df(base_data_path: str, monkey: str, csv_name: str, scenefile_name: str) -> tuple:
+def load_meta_and_scene_df(base_data_path: Path, monkey: str, csv_name: str, scenefile_name: str) -> tuple:
     """Load metadata and scene dataframe"""
     meta = pd.read_csv((base_data_path / monkey /  'stim_info').as_posix() + f'/{csv_name}', header = None, names= ['category'])
     scene_df = gen_scene_df((base_data_path / monkey / 'scenefiles_update' / scenefile_name).as_posix())

@@ -1,13 +1,14 @@
 #### useful functions for retrieving filepaths and other session info
 
 import numpy as np
+import pandas as pd
 import os
-import pathlib as Path
+from pathlib import Path
 import re
 from natsort import os_sorted
 import pickle
 import json
-from utils_mkturk import * 
+from utils_mkturk import gen_scene_df, gen_short_scene_info
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
@@ -17,10 +18,10 @@ def get_recording_path(base_data_path, monkey, date,depth = 4):
 
     filepath = []
     for long_path in long_paths:
-        sub_lists = [x[0] for x in os.walk(long_path) if len(Path.Path(x[0]).parents)-len(Path.Path(base_data_path).parents) ==depth]
+        sub_lists = [x[0] for x in os.walk(long_path) if len(Path(x[0]).parents)-len(Path(base_data_path).parents) ==depth]
         for s in sub_lists:
-            result = re.search('\Dep(.*?)\_', Path.Path(s).name)
-            if result is not None and 'dk' not in Path.Path(s).name:
+            result = re.search('\Dep(.*?)\_', Path(s).name)
+            if result is not None and 'dk' not in Path(s).name:
                 depth_start = result.group(1).split('-')[0]
                 depth_end = result.group(1).split('-')[1]
 
@@ -31,12 +32,12 @@ def get_recording_path(base_data_path, monkey, date,depth = 4):
 
 def get_scenefiles_sess(base_data_path, monkey, date):
     # returns scenefiles used in the sesssion
-    folder = os_sorted(Path.Path(base_data_path, monkey).glob('*' +date + '*'))
+    folder = os_sorted(Path(base_data_path, monkey).glob('*' +date + '*'))
     scenefiles = []
     for f in folder:
         print(f)
-        if os.path.isdir(Path.Path(base_data_path, monkey, f)):
-            behav_file_list= os_sorted(Path.Path(f).glob('*.json'))
+        if os.path.isdir(Path(base_data_path, monkey, f)):
+            behav_file_list= os_sorted(Path(f).glob('*.json'))
             for b_f in behav_file_list:
                 m = json.load(open(b_f,'rb'))
                 if m['TASK']['RewardStage'] == 1:
@@ -46,12 +47,12 @@ def get_scenefiles_sess(base_data_path, monkey, date):
 
 def get_stims_sess(base_data_path, monkey, date):
     # returns all short stimulus id used in behavior files  
-    folder = os_sorted(Path.Path(base_data_path, monkey).glob('*' +date + '*'))
+    folder = os_sorted(Path(base_data_path, monkey).glob('*' +date + '*'))
     
     stims = []
     for f in folder:
-        if os.path.isdir(Path.Path(base_data_path, monkey, f)):
-            behav_file_list= os_sorted(Path.Path(f).glob('*.json'))
+        if os.path.isdir(Path(base_data_path, monkey, f)):
+            behav_file_list= os_sorted(Path(f).glob('*.json'))
             if len(behav_file_list) ==  0:
                 print('no behavior file in the folder')
                 continue
@@ -73,16 +74,16 @@ def get_allsess_stim(base_data_path,monkey,stim_list, base_save_out_path):
         data_path = get_recording_path(base_data_path, monkey, date,depth = 3)
         n_recordings = len(data_path)
         for dp in data_path:
-            dp = Path.Path(dp)
+            dp = Path(dp)
             penetration = dp.relative_to(base_data_path/monkey).as_posix().split('/')[0]
             save_out_root_path = base_save_out_path / monkey
-            save_out_path = Path.Path(save_out_root_path, penetration)
+            save_out_path = Path(save_out_root_path, penetration)
 
             if n_recordings> 1:
-                save_out_path = Path.Path(save_out_root_path, penetration, dp.parts[len(dp.parts)-1])
+                save_out_path = Path(save_out_root_path, penetration, dp.parts[len(dp.parts)-1])
 
             try: # try look for stim_sess_info since it already has all stimulus id used in the session 
-                stim_info_sess = pickle.load(open(Path.Path(save_out_path / 'stim_info_sess'), 'rb'))
+                stim_info_sess = pickle.load(open(Path(save_out_path / 'stim_info_sess'), 'rb'))
                 stim_keys_sess = stim_info_sess.keys()
                 if len(set(stim_keys_sess).intersection(stim_list)) > 0:
                     allsess.append(f)
@@ -105,16 +106,16 @@ def get_allsess_scenefile(base_data_path,monkey,scenefile_list, base_save_out_pa
         data_path = get_recording_path(base_data_path, monkey, date,depth = 3)
         n_recordings = len(data_path)
         for dp in data_path:
-            dp = Path.Path(dp)
+            dp = Path(dp)
             penetration = dp.relative_to(base_data_path/monkey).as_posix().split('/')[0]
             save_out_root_path = base_save_out_path / monkey
-            save_out_path = Path.Path(save_out_root_path, penetration)
+            save_out_path = Path(save_out_root_path, penetration)
 
             if n_recordings> 1:
-                save_out_path = Path.Path(save_out_root_path, penetration, dp.parts[len(dp.parts)-1])
+                save_out_path = Path(save_out_root_path, penetration, dp.parts[len(dp.parts)-1])
 
             try: # try look for stim_sess_info since it already has all stimulus id used in the session 
-                psth_scenefile_meta = pickle.load(open(Path.Path(save_out_path / 'psth_scenefile_meta'), 'rb'))
+                psth_scenefile_meta = pickle.load(open(Path(save_out_path / 'psth_scenefile_meta'), 'rb'))
                 scenefiles_sess = np.array(list(psth_scenefile_meta.keys()))
                 if len(set(scenefiles_sess).intersection(scenefile_list)) > 0:
                     allsess.append(f)
@@ -130,10 +131,10 @@ def get_allsess_scenefile(base_data_path,monkey,scenefile_list, base_save_out_pa
 
 def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
-    folder = os_sorted(Path.Path(base_data_path, monkey).glob('*' +date + '*'))[0]
+    folder = os_sorted(Path(base_data_path, monkey).glob('*' +date + '*'))[0]
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
-    data_path = Path.Path(data_path)
+    data_path = Path(data_path)
     str_vec = data_path.name.split('_')
     if 'HAng' in data_path.name:
         
@@ -163,13 +164,13 @@ def get_coords_sess(base_data_path, monkey, date):
     return ap_coord, dv_coord, ml_coord, ang, hang, depth_start
 
 def gen_meta_behavior(base_data_path, monkey):
-    folders = os_sorted(Path.Path(base_data_path, monkey).glob(monkey + '*'))
+    folders = os_sorted(Path(base_data_path, monkey).glob(monkey + '*'))
     df_behavior = []
     columns_behavior = ['sub', 'date','behavior file', 'scenefile']
     for folder in folders:
         # get meta info on all behavior files in the path 
-        date_str = Path.Path(folder).name.split('_')[1]
-        behav_file_list= os_sorted(Path.Path(folder).glob('*.json'))
+        date_str = Path(folder).name.split('_')[1]
+        behav_file_list= os_sorted(Path(folder).glob('*.json'))
         if len(behav_file_list) == 0:
             print('no behavior file in this folder')
         else:
@@ -186,14 +187,14 @@ def gen_meta_behavior(base_data_path, monkey):
     return df_behavior 
 
 def update_meta_behavior(base_data_path,monkey,df_behavior):
-    folders = os_sorted(Path.Path(base_data_path, monkey).glob(monkey + '*'))
-    all_dates = [Path.Path(folder).name.split('_')[1] for folder in folders]
+    folders = os_sorted(Path(base_data_path, monkey).glob(monkey + '*'))
+    all_dates = [Path(folder).name.split('_')[1] for folder in folders]
     dates_diff = np.sort(list(set(list(map(str,df_behavior['date']))).symmetric_difference(all_dates)))
 
     for date in dates_diff:
         print(date)
-        folder  = os_sorted(Path.Path(base_data_path,monkey).glob('*' + date + '*'))[0]
-        behav_file_list= os_sorted(Path.Path(folder).glob('*.json'))
+        folder  = os_sorted(Path(base_data_path,monkey).glob('*' + date + '*'))[0]
+        behav_file_list= os_sorted(Path(folder).glob('*.json'))
         if len(behav_file_list) == 0:
             print('no behavior file in this folder')
         else:
@@ -217,13 +218,13 @@ def init_dirs(base_data_path, monkey, date, base_save_out_path):
     n_recordings = len(data_path_list)
     print(n_recordings, ' recordings found')
     if n_recordings !=0:
-        data_path = [Path.Path(d) for d in data_path_list]
+        data_path = [Path(d) for d in data_path_list]
         penetration = [d.relative_to(base_data_path/monkey).as_posix().split('/')[0] for d in data_path]
         if n_recordings > 1:
-            save_out_path = [Path.Path(save_out_root_path, p, d.parts[len(d.parts)-2]) for d,p in zip(data_path,penetration)]
+            save_out_path = [Path(save_out_root_path, p, d.parts[len(d.parts)-2]) for d,p in zip(data_path,penetration)]
             plot_save_out_path = [base_save_out_path/ (monkey + '_plots') / p/ s.name for s,p in zip(save_out_path,penetration)]
         else:
-            save_out_path = [Path.Path(save_out_root_path, p) for p in penetration]
+            save_out_path = [Path(save_out_root_path, p) for p in penetration]
             plot_save_out_path =  [base_save_out_path/ (monkey + '_plots') / p for p in penetration]
     else:
         save_out_path = ''
