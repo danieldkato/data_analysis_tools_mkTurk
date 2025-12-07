@@ -9,7 +9,7 @@ from utils_ephys import get_FSI_allchans, get_FSI_heatmap
 from utils_meta import init_dirs, get_chanmap, get_coords_sess
 import matplotlib.pyplot as plt 
 import math
-from make_engram_path import ENGRAM_PATH
+from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def allchan_objaverse(monkey: str, date: str):
     """
@@ -45,8 +45,8 @@ def allchan_objaverse(monkey: str, date: str):
         - Requires previously generated per-channel PSTH pickle files
     """
 
-    base_data_path = ENGRAM_PATH / 'Data'
-    base_save_out_path = ENGRAM_PATH / 'users/Younah/ephys'
+    base_data_path = BASE_DATA_PATH
+    base_save_out_path = BASE_SAVE_OUT_PATH
 
     data_path_list, save_out_path_list, plot_save_out_path_list = init_dirs(base_data_path, monkey, date, base_save_out_path)
     for n,(data_path, save_out_path, plot_save_out_path) in enumerate(zip(data_path_list, save_out_path_list, plot_save_out_path_list)):

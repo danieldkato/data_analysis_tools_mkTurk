@@ -10,3 +10,6 @@ elif 'Younah' in host:
     ENGRAM_PATH = Path('/Volumes/issa-locker/')
 else:
     raise ValueError(f"Unknown host: {host}")
+
+BASE_DATA_PATH = ENGRAM_PATH / 'Data'
+BASE_SAVE_OUT_PATH = ENGRAM_PATH / 'users/Younah/ephys'

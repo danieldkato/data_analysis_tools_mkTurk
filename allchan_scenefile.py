@@ -6,7 +6,7 @@ import sys
 import numpy as np
 from utils_ephys import get_psth_byscenefile_allchans, gen_heatmap_byscenefile
 from utils_meta import init_dirs, get_chanmap
-from make_engram_path import ENGRAM_PATH
+from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
 def allchan_scenefile(monkey: str, date: str):
@@ -33,8 +33,8 @@ def allchan_scenefile(monkey: str, date: str):
         SystemExit: If stim_info_sess file doesn't exist for the last session in data_path_list.
     """
 
-    base_data_path = ENGRAM_PATH / 'Data'
-    base_save_out_path = ENGRAM_PATH / 'users/Younah/ephys'
+    base_data_path = BASE_DATA_PATH
+    base_save_out_path = BASE_SAVE_OUT_PATH
 
     print(date)
 

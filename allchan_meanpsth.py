@@ -8,7 +8,7 @@ import numpy as np
 from utils_meta import init_dirs
 import matplotlib.pyplot as plt 
 import math
-from make_engram_path import ENGRAM_PATH
+from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def allchan_meanpsth(monkey: str, date: str):
     """
@@ -39,8 +39,8 @@ def allchan_meanpsth(monkey: str, date: str):
         - Uses ENGRAM_PATH global variable for base path construction
         - Output shape: (n_chans, n_stims, time_bins) where n_chans=384
     """
-    base_data_path = ENGRAM_PATH / 'Data'
-    base_save_out_path = ENGRAM_PATH / 'users/Younah/ephys'
+    base_data_path = BASE_DATA_PATH
+    base_save_out_path = BASE_SAVE_OUT_PATH
 
     print(date)
 
