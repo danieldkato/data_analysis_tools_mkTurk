@@ -1,6 +1,6 @@
 import numpy as np
 import math
-import pathlib as Path
+from pathlib import Path
 import pickle
 import os
 import sys
@@ -141,7 +141,7 @@ def get_data_bysc(n_chan, MUA_dir, data_dict_path,save_out_path, t_before = 0.1,
     for d_path in data_dict_path:
         data_dict = pickle.load(open(d_path,'rb'))
         # get behavior file name
-        behav_file = Path.Path(d_path).stem.split('data_dict_')[1]
+        behav_file = Path(d_path).stem.split('data_dict_')[1]
         scenefile = data_dict[0]['scenefile']
         print(behav_file)
 
@@ -287,7 +287,7 @@ def get_data_bysc_all(n_chan, MUA_dir, data_dict_path,save_out_path, t_before = 
 
     data_dict = pickle.load(open(data_dict_path,'rb'))
     # get behavior file name
-    #behav_file = Path.Path(d_path).stem.split('data_dict_')[1]
+    #behav_file = Path(d_path).stem.split('data_dict_')[1]
    #scenefile = data_dict[0]['scenefile']
     #print(behav_file)
 
@@ -414,7 +414,7 @@ def get_psth_byscenefile_allchans(save_out_path):
                 psth_all.append(psth_mean)
 
         psth_new = np.vstack(psth_all)
-        pickle.dump(psth_new, open(save_out_path / ('psth_' + Path.Path(s).stem),'wb'),protocol = 2)
+        pickle.dump(psth_new, open(save_out_path / ('psth_' + Path(s).stem),'wb'),protocol = 2)
         
 def load_kilosort(n_chan, kilosort_dir):
 
@@ -613,7 +613,7 @@ def gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap):
         t_after = psth_meta[s]['t_after']
         binwidth_psth = psth_meta[s]['binwidth']
     
-        psth = pickle.load(open(os_sorted(save_out_path.glob('psth_' + Path.Path(s).stem))[0],'rb'))
+        psth = pickle.load(open(os_sorted(save_out_path.glob('psth_' + Path(s).stem))[0],'rb'))
 
         n_trials = psth_meta[s]['n_trials']
         assert psth.shape[0] == chanmap.shape[0]
@@ -621,9 +621,9 @@ def gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap):
         psth = psth[np.argsort(chanmap[:,1]),:]
         fig, ax = gen_heatmap(psth,-t_before,stim_dur + t_after, binwidth_psth)
 
-        ax.set_title(Path.Path(s).stem + '\n' + str(n_trials) + ' trials', size = 20, pad = 20)
+        ax.set_title(Path(s).stem + '\n' + str(n_trials) + ' trials', size = 20, pad = 20)
 
-        filename = Path.Path(s).stem + '.png'
+        filename = Path(s).stem + '.png'
         fig.savefig(plot_save_out_path/ filename,bbox_inches = 'tight')
         plt.close()
 
@@ -636,9 +636,9 @@ def gen_heatmap_byscenefile(save_out_path, plot_save_out_path,chanmap):
 
         # fig, ax = gen_heatmap(zscored,- t_before,stim_dur-0.05, binwidth_psth, -5, 5)
 
-        # ax.set_title(Path.Path(s).stem + '\n' + str(n_trials) + ' trials', size = 20, pad = 20)
+        # ax.set_title(Path(s).stem + '\n' + str(n_trials) + ' trials', size = 20, pad = 20)
 
-        # filename = Path.Path(s).stem + '_zscored.png'
+        # filename = Path(s).stem + '_zscored.png'
         # fig.savefig(plot_save_out_path/ filename,bbox_inches = 'tight')
 
         # plt.close()
@@ -692,7 +692,7 @@ def gen_psth_plots_bysc(n_chan,save_out_path, ch_psth_path_list, ch_psth_meta_pa
         ax.set_ylabel('FR (spks/sec)')
         ax.set_xlim([-psth_meta['t_before'], psth_meta['max_sc_dur']+ psth_meta['t_after']])
         ax.set_ylim([0,max_fr])
-        ax.set_title(Path.Path(psth_meta['scenefile']).stem + '\n' + psth_meta['behav_file'] + ' \n' + str(psth_meta['n_trs']) + ' trials ' + 
+        ax.set_title(Path(psth_meta['scenefile']).stem + '\n' + psth_meta['behav_file'] + ' \n' + str(psth_meta['n_trs']) + ' trials ' + 
                     str(psth_meta['n_spikes_sc']) + ' spikes' )
         
         n_spikes_tot += psth_meta['n_spikes_sc']
@@ -746,7 +746,7 @@ def gen_psth_byscenefile(n_chan,save_out_path, psth, psth_meta,chanmap):
         ax.set_ylabel('FR (spks/sec)')
         ax.set_xlim([-psth_meta[s]['t_before'], psth_meta[s]['stim_dur']+ psth_meta[s]['t_after']])
         ax.set_ylim([0,max_fr])
-        ax.set_title(Path.Path(s).stem + '\n' + str(n_trials) + ' trials ')
+        ax.set_title(Path(s).stem + '\n' + str(n_trials) + ' trials ')
 
     print(n_chan,int(np.where(np.argsort(chanmap[:,1]) == n_chan)[0]))
     fig.suptitle('ch{:0>3d} \n '.format(int(np.where(np.argsort(chanmap[:,1]) == n_chan)[0])))

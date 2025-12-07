@@ -2,9 +2,8 @@
 #IMPORTS
 import sys
 import matplotlib.pyplot as plt
-from utils import *
-from utils_meta import *
-import pathlib as Path
+from utils_meta import get_recording_path
+from pathlib import Path
 import socket 
 host = socket.gethostname()
 import sys
@@ -46,8 +45,8 @@ import glob
 import socket 
 host = socket.gethostname()
 
-#engram_path = Path.Path('Z:/')
-engram_path = Path.Path(os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker'))
+#engram_path = Path('Z:/')
+engram_path = Path(os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker'))
 
 base_data_path = engram_path / 'Data'
 base_save_out_path = engram_path / 'users/Younah/ephys'
@@ -57,7 +56,7 @@ date = sys.argv[2]
 folder_path = next((base_data_path/monkey).glob('*' + date + '*'))
 data_path_list = get_recording_path(base_data_path,monkey,date)
 for data_path in data_path_list:
-    data_path = Path.Path(data_path)
+    data_path = Path(data_path)
     print('\nData path found: '+ str(data_path.exists()))
 
     meta_iter = data_path.glob('*ap.meta')
@@ -128,7 +127,7 @@ for data_path in data_path_list:
 
         print(digCh)
 
-        trig_dir = data_path / Path.Path('imec_trig')
+        trig_dir = data_path / Path('imec_trig')
         trig_dir.mkdir(exist_ok=False)
 
     # %%
@@ -165,7 +164,7 @@ for data_path in data_path_list:
     min_dist = 20 # min number of samples between peaks (corresponds to 6.6 microsec)
 
     # %%
-    MUA_dir = data_path / Path.Path('MUA_4SD')
+    MUA_dir = data_path / Path('MUA_4SD')
     MUA_dir.mkdir(exist_ok=False)
 
     # %%
@@ -247,7 +246,7 @@ for data_path in data_path_list:
             digArray = raw_data[digCh,first_samp:last_samp].squeeze()
             ind = np.where(digArray != 0)[0] + first_samp
             save_file_name = f'trig_ind_{first_samp}_{last_samp}'
-            np.save(Path.Path(trig_dir, save_file_name), ind)
+            np.save(Path(trig_dir, save_file_name), ind)
         
         # APPLY GAIN CORRECTION
         #print('gain correction')
@@ -548,7 +547,7 @@ for data_path in data_path_list:
 
     # %%
     save_out_name = 'trig_ind'
-    np.save(Path.Path(trig_dir,save_out_name),(on_ind,off_ind))
+    np.save(Path(trig_dir,save_out_name),(on_ind,off_ind))
 
     # %%
     # remove chunked trig npy files 

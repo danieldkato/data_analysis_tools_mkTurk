@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-import pathlib as Path
+from pathlib import Path
 import h5py
 import pickle
 import json
@@ -257,8 +257,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         if output_directory is None:
             output_directory = os.getcwd()
             
-        if not os.path.exists(output_directory):
-            Path.Path(output_directory).mkdir(parents=True, exist_ok=True)
+        if not Path(output_directory).exists():
+            Path(output_directory).mkdir(parents=True, exist_ok=True)
             
         output_path = os.path.join(output_directory, 'all_psth.h5'.format(monkey, date)) 
         
