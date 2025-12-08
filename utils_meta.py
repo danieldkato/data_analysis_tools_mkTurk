@@ -233,6 +233,78 @@ def init_dirs(base_data_path, monkey, date, base_save_out_path):
     return data_path, save_out_path, plot_save_out_path
 
 
+def find_channels(directory, prefix=None):
+    """
+    Find channels for which input directory contains preprocessed data. Assumes 
+    that input directory includes files containing preprocessed data from one 
+    channel each (e.g. pickle files containing PSTHs). Note however that there
+    may be multiple files containing different data from a single channel. 
+    Parameters
+    ----------
+    directory : str
+        Path to directory to search.
+        
+    prefix : str, optional
+        Use to restrict search to files containing certain strings immediately 
+        following channel number. E.g., if prefix='psth', then will only search
+        files whose names begin 'ch<nnn>_psth'. The default is None.
+    Returns
+    -------
+    chans : numpy.ndarray
+        Array of channels in current directory.
+    """
+    if prefix is None:
+        prefix = ''
+
+    # Define regex:
+    regex = 'ch\d{3}' + prefix
+
+    # List directory contents:
+    filenames = os.listdir(directory)
+
+    # Find patterns matching regex:
+    prefixes = [re.search(regex,x).group() for x in filenames if re.search(regex,x) is not None]
+    indices = [int(x[2:5]) for x in prefixes] # convert channel numbers to int
+    chans = np.unique(indices)
+
+    return chans
+
+
+def get_all_metadata_sess(preprocessed_data_path):
+
+    files = os.listdir(preprocessed_data_path)
+
+    # Get session metadata:
+    sess_meta_path = os.path.join(preprocessed_data_path, 'stim_info_sess') # < Hack; assuming this always exists
+    sess_meta = pickle.load(open(sess_meta_path, 'rb'))
+
+    # Get stim metadata:
+    psth_stim_meta_regex = 'psth_stim_meta'
+    psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in files if re.search(psth_stim_meta_regex,x) is not None]
+    stim_meta_file = psth_stim_meta_matches[0] # < Assume metadata is the same for all channels
+    stim_meta_path = os.path.join(preprocessed_data_path, stim_meta_file) # < Hack; assuming this always exists
+    stim_meta = pickle.load(open(stim_meta_path, 'rb'))
+
+    # Get scenefile metadata:
+    psth_scenefile_meta_regex = 'psth_scenefile_meta'
+    psth_scenefile_meta_matches = [re.search(psth_scenefile_meta_regex,x).group() for x in files if re.search(psth_scenefile_meta_regex,x) is not None]
+    scenefile_meta_file = psth_scenefile_meta_matches[0] # < Assume metadata is the same for all channels
+    scenefile_meta_path = os.path.join(preprocessed_data_path, scenefile_meta_file) # < Hack; assuming this always exists
+    scenefile_meta = pickle.load(open(scenefile_meta_path, 'rb'))
+
+    return sess_meta, scenefile_meta, stim_meta
+
+
+def scenefile2rsvp_inds(data_dicts, scenefile):
+
+    data_dicts_sfile = [data_dicts[x] for x in np.arange(len(data_dicts)) if data_dicts[x]['scenefile']==scenefile]
+    trial_nums = [x['trial_num'] for x in data_dicts_sfile]                                                         
+    rsvp_nums = [x['rsvp_num'] for x in data_dicts_sfile]                                                         
+
+    A = np.array([trial_nums, rsvp_nums]).T
+
+    return A
+
 # read imroTbl 
 def read_imroTbl(meta):
     n_chans = int(meta['nSavedChans'])-1
