@@ -22,7 +22,7 @@ except ImportError:
 
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None, 
-    chunk_size=100, dtype=float, save_output=False, output_directory=None):
+    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None):
     """
     Combine pickled dicts of single-channel PSTHs into single HDF5. 
 
@@ -98,10 +98,12 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         
     # Define default preprocessed data path if necessary:
     if preprocessed_data_path is None:
-        preprocessed_data_path = get_recording_path(base_data_path, monkey, date, depth=4)[0]
+        preprocessed_data_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
+    
+    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
     
     # Load metadata for current session
-    recording_dir = get_recording_path(base_data_path, monkey, date, depth=4)[0].split(os.sep)[-1]
+    recording_dir = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0].split(os.sep)[-1]
     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
     sess_meta_df = sess_meta_dict_2_df(sess_meta)
     stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
@@ -123,9 +125,17 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_params_df['idx_merge'] = np.arange(n_rows)
     trial_params_df = trial_params_df.set_index('idx_merge')
     
+    # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
+    # m images, then index of first image of scenefile b will be m, not 0:
+    offsets_df = trial_params_df[['scenefile', 'stim_idx']].groupby('scenefile').min().reset_index()
+    offsets_df = offsets_df.rename(columns={'stim_idx':'offset'})
+    trial_params_df = pd.merge(trial_params_df, offsets_df, on=['scenefile'])
+    trial_params_df['stim_idx'] = trial_params_df['stim_idx'] - trial_params_df['offset']
+    trial_params_df['stim_idx'] = trial_params_df['stim_idx'].drop(columns='offset')
+    
     # Try to retrieve THREEJS params directly from behavior files:
     behav_df = pd.DataFrame()
-    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if date in x]
+    sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if pen_id in x]
     if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
         sess_dir = os.path.join(base_data_path, monkey, sess_dirs[0])
         behav_files = np.unique(trial_params_df.behav_file)
@@ -154,31 +164,18 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 curr_sfile_df['behav_file'] = b
                 behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
     trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
+    trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)       
                 
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
     # From stim_meta (one value per dict): iti_dur, t_before, t_after 
     # From sess_meta: reward, reward_dur
-    monkey_col = [monkey] * n_rows 
-    date_col = [date] * n_rows
-    reward_bool = sess_meta_df['reward_bool']
-    extra_params_df = pd.DataFrame({'monkey' : monkey_col, 
-                                    'date' : date_col, 
-                                    'reward_bool' : reward_bool})
-    extra_params_df['idx'] = np.arange(n_rows) # < Only need this temporarily to concatenate dataframes
-    extra_params_df = extra_params_df.set_index('idx')
-    trial_params_df = pd.concat([extra_params_df, trial_params_df], axis=1)
-    
-    # Apply offsets to stim_idx; recall if scenefile b follows scenefile a with
-    # m images, then index of first image of scenefile b will be m, not 0:
-    offsets_df = trial_params_df[['scenefile', 'stim_idx']].groupby('scenefile').min().reset_index()
-    offsets_df = offsets_df.rename(columns={'stim_idx':'offset'})
-    trial_params_df = pd.merge(trial_params_df, offsets_df, on=['scenefile'])
-    trial_params_df['stim_idx'] = trial_params_df['stim_idx'] - trial_params_df['offset']
-    trial_params_df['stim_idx'] = trial_params_df['stim_idx'].drop(columns='offset')
+    trial_params_df['monkey'] = monkey
+    trial_params_df['date'] = date
+    trial_params_df['reward_bool'] = sess_meta_df.reward_bool
     
     # Try to get paths to saved images:
-    trial_params_df = find_im_full_paths(trial_params_df, base_data_path)
+    trial_params_df = add_im_full_paths(trial_params_df, base_data_path)
         
     # Copy general timing params to own dict as formal return:
     bin_width = stim_meta[stim_ids[0]]['binwidth'] # < Hack; assuming (probably safely) that same for all stim
@@ -203,18 +200,23 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     scenefile_mat = np.array([[x in scenefile_meta[y]['stim_ids'] for y in scenefiles] for x in stim_ids])
     scenefile_mat = scenefile_mat.T 
    
-    # Get coordinates of different sites:
-    coords_df = get_site_coords(base_data_path, monkey, date, spacing=20, tip_length=175) # < Hard-coded for now
-    coords_df = coords_df.sort_values('depth', ascending=False) # < Assume that channels have already been sorted by depth (lower channel # > deeper, higher channel # > more superficial)
-    coords_df = coords_df.drop(columns='channel') # < Drop absolute channel IDs from IMRO table, which will conflict with new channel indices ordered by depth
-   
-    
+    # Get stereotaxic coordinates of zero point (where probe touches surface of brain) for current session:
+    zero_coords = get_coords_sess(base_data_path, monkey, date)
+    glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
+    if glx_meta_path is not None:
+        if 'win' in sys.platform:
+            glx_meta_path = '\\\\?\\' + glx_meta_path
+        imro_tbl = extract_imro_table(glx_meta_path)
+    else:
+        imro_tbl = pd.DataFrame()
+        warnings.warn('No .ap.meta file discovered for {} session {}.'.format(monkey, date))
+        
     # Initialize data array:
     if channels is None:
         channels = find_channels(preprocessed_data_path)
     n_bins = len(psth_bins) - 1
     n_trials = np.max(trial_params_df['trial_num']) + 1
-    n_rsvp = 3 # < Assuming 3 RSVP stim per trial 
+    n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
 
@@ -257,10 +259,10 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         if output_directory is None:
             output_directory = os.getcwd()
             
-        if not Path(output_directory).exists():
-            Path(output_directory).mkdir(parents=True, exist_ok=True)
+        if not os.path.exists(output_directory):
+            Path.Path(output_directory).mkdir(parents=True, exist_ok=True)
             
-        output_path = os.path.join(output_directory, 'all_psth.h5'.format(monkey, date)) 
+        output_path = os.path.join(output_directory, fname+'.h5') 
         
         print('Saving HDF5 to disk...')
         with h5py.File(output_path, 'w') as f:
@@ -301,7 +303,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             #"""
             
             # Write channel coordinates:
-            coords_df.to_hdf(output_path, 'site_coordinates', 'a', format='fixed')
+            zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
+            imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
             
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
@@ -749,7 +752,7 @@ def standardize_col_types(df):
 
 
 
-def find_im_full_paths(trial_params_df, local_data_path=None):
+def add_im_full_paths(trial_params_df, local_data_path=None):
     
     # If input dataframe already has img_full_path columns, delete it; will replace
     if 'img_full_path' in trial_params_df.columns:
