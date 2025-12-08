@@ -492,3 +492,37 @@ def gen_short_scene_info(scene_df):
 
     return scene_df_short
 
+
+def expand_sess_scenefile2stim(scenefile_meta, scenefiles):
+    """
+    Returns union of all stim_ids associated with any in a list of scenefiles.
+
+    Parameters
+    ----------
+    scenefile_meta : dict
+        Same format as dict encoded by 'ch<ccc>_scenefile_meta' files in 
+        preprocessed data directories.
+        
+    scenefiles : list
+        List of scenefiles to expand.
+
+    Returns
+    -------
+    stim_ids : TYPE
+        DESCRIPTION.
+
+    """
+
+    stim_ids = []
+    for sf in scenefiles:
+        stim_conds = scenefile_meta[sf]['stim_ids']      
+        stim_ids.append(stim_conds)
+
+    # Raise a warning if there is overlap in stim_ids included in different
+    # scenefiles in current class:
+    if not len(stim_ids) == len(np.unique(stim_ids)):
+        warnings.warn('Overlapping stim_ids between scenefiles in current class.')
+
+    stim_ids = np.unique(stim_ids)
+
+    return stim_ids
