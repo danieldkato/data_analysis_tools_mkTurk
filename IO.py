@@ -201,8 +201,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     scenefile_mat = scenefile_mat.T 
    
     # Get stereotaxic coordinates of zero point (where probe touches surface of brain) for current session:
-    zero_coords = get_coords_sess(base_data_path, monkey, date)
-    glx_meta_path = get_sess_metadata_path(base_data_path, monkey, date)
+    zero_coords = get_coords_sess(Path(base_data_path), Path(monkey), date)
+    glx_meta_path = get_sess_metadata_path(Path(base_data_path), Path(monkey), date)
     if glx_meta_path is not None:
         if 'win' in sys.platform:
             glx_meta_path = '\\\\?\\' + glx_meta_path
