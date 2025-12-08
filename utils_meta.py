@@ -135,7 +135,7 @@ def get_coords_sess(base_data_path, monkey, date):
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
 
-    name = Path.Path(data_path).name
+    name = Path(data_path).name
     
     # Define field names and corresponding search patterns:
     patterns = {'hole_id' : '_H\d+\.*\d*_', 
