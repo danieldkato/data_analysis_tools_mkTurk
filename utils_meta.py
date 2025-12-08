@@ -129,39 +129,55 @@ def get_allsess_scenefile(base_data_path,monkey,scenefile_list, base_save_out_pa
 
     return allsess
 
+
 def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
-    folder = os_sorted(Path(base_data_path, monkey).glob('*' +date + '*'))[0]
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
-    data_path = Path(data_path)
-    str_vec = data_path.name.split('_')
-    if 'HAng' in data_path.name:
-        
-        hemisphere = str_vec[2]
-        hole_id = int(str_vec[3].split('H')[1])
-        pen_id = int(str_vec[4].split('P')[1])
-        ap_coord = float(str_vec[5].split('AP')[1])
-        dv_coord = float(str_vec[6].split('DV')[1])
-        ml_coord = float(str_vec[7].split('ML')[1])
-        ang = float(str_vec[8].split('Ang')[1])
-        hang = float(str_vec[9].split('HAng')[1])
-        depth_start = int(str_vec[10].split('Dep')[1].split('-')[0])
-        depth_end = str_vec[10].split('Dep')[1].split('-')[1]
-    else:
-        
-        hemisphere = str_vec[2]
-        hole_id = int(str_vec[3].split('H')[1])
-        pen_id = int(str_vec[4].split('P')[1])
-        ap_coord = float(str_vec[5].split('AP')[1])
-        dv_coord = float(str_vec[6].split('DV')[1])
-        ml_coord = float(str_vec[7].split('ML')[1])
-        ang = float(str_vec[8].split('Ang')[1])
-        depth_start = int(str_vec[9].split('Dep')[1].split('-')[0])
-        depth_end = str_vec[9].split('Dep')[1].split('-')[1]
-        hang = 0
 
-    return ap_coord, dv_coord, ml_coord, ang, hang, depth_start
+    name = Path.Path(data_path).name
+    
+    # Define field names and corresponding search patterns:
+    patterns = {'hole_id' : '_H\d+\.*\d*_', 
+                'penetration' : '_P\d+\.*\d*_', 
+                'AP' : 'AP-{0,1}\d+\.*\d*', 
+                'DV' : 'DV-{0,1}\d+\.*\d*', 
+                'ML' : 'ML-{0,1}\d+\.*\d*', 
+                'Ang'  : '[^H]Ang\d+\.*\d', 
+                'HAng' : 'HAng\d+\.*\d*'}
+    regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
+    
+    # Iterate over numeric fields (except depth):
+    zero_coord_series = pd.Series()
+    for idx, row in regex_lut.iterrows():
+        matches = re.findall(row.regex, name)
+        if len(matches) == 1:
+            val = float(re.search('-{0,1}\d+\.*\d*', matches[0]).group())
+        else:
+            val = None
+        zero_coord_series[idx] = val
+
+    # Find depth (requires separate treatment from other numeric parameters bc
+    # filenames include both starting and stop depth):
+    depth_regex = 'Dep\d+-\d+'
+    depth_matches = re.findall(depth_regex, name)
+    if len(depth_matches) == 1:
+        depth_vals = re.findall('\d+', depth_matches[0])
+        depth = float(depth_vals[1])
+    else:
+        depth = None
+    zero_coord_series['depth'] = depth
+        
+    # Find brain hemisphere:
+    hemisphere_str = re.findall('_(L|R)_', name)
+    if len(hemisphere_str) == 1:
+        hemisphere = re.search('(L|R)', hemisphere_str[0]).group()
+    else:
+        hemisphere = None
+    zero_coord_series['hemisphere'] = hemisphere
+
+    return zero_coord_series
+
 
 def gen_meta_behavior(base_data_path, monkey):
     folders = os_sorted(Path(base_data_path, monkey).glob(monkey + '*'))
