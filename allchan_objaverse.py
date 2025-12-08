@@ -101,8 +101,10 @@ def allchan_objaverse(monkey: str, date: str):
         except:
             chanmap, imroTbl = get_chanmap(data_path)
 
-
-        ap_coord, dv_coord, ml_coord, ang, hang, dep = get_coords_sess(base_data_path, monkey, str(date))
+        #ap_coord, dv_coord, ml_coord, ang, hang, dep = get_coords_sess(base_data_path, monkey, str(date))
+        zero_coord_series = get_coords_sess(base_data_path, monkey, str(date))
+        coord_keys = ['AP', 'DV', 'ML', 'Ang', 'HAng', 'depth']
+        ap_coord, dv_coord, ml_coord, ang, hang, dep = tuple([zero_coord_series[key] for key in coord_keys])  
         print(ap_coord, dv_coord, ml_coord, ang, hang, dep)
         max_depth = dep
         
