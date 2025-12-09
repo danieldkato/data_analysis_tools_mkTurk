@@ -143,8 +143,8 @@ def get_coords_sess(base_data_path, monkey, date):
                 'AP' : 'AP-{0,1}\d+\.*\d*', 
                 'DV' : 'DV-{0,1}\d+\.*\d*', 
                 'ML' : 'ML-{0,1}\d+\.*\d*', 
-                'Ang'  : '[^H]Ang\d+\.*\d', 
-                'HAng' : 'HAng\d+\.*\d*'}
+                'Ang'  : '[^H]Ang-*\d+\.*\d', 
+                'HAng' : 'HAng-*\d+\.*\d*'}
     regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
