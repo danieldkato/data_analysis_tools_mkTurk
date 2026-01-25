@@ -1273,10 +1273,57 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     df['date'] = df.apply(lambda x : ''.join([x.dateparts[2].zfill(4), x.dateparts[0].zfill(2), x.dateparts[1].zfill(2)]) if x.dateparts is not None else None, axis=1)
     df = df.drop(columns='dateparts')
     
+    monkeys = df.monkey.unique()
+    Rs = []
+
+    for monkey in monkeys: 
+
+        curr_rows = df[df.monkey==monkey].copy()
+        
+        # Get experiment type for each row:
+        Expts = curr_rows.apply(lambda x : re.search('(E|L)\d{1,2}', x.Expt).group() if (type(x.Expt)==str and re.search('(E|L)\d{1,2}', x.Expt) is not None) else None, axis=1)
+        curr_rows['Expt_num'] = Expts
+        curr_rows.loc[curr_rows.apply(lambda x : type(x.Expt_num)==str and  'L' in x.Expt_num, axis=1), 'Expt_num'] = 'E1' # HACK; replace 'L<n>' with 'E1'; switched naming convention at some point
+        
+        # Try to get manually-entered series number for each row:
+        series_nums_manual = curr_rows.apply(lambda x : int(re.search('_\d{1,2}', x.Expt).group()[-2:]) if (type(x.Expt)==str and re.search('_\d{1,2}', x.Expt) is not None) else None, axis=1)
+        curr_rows['series_num_manual'] = series_nums_manual
+        
+        # Try to automatically get series number for each session: 
+        expt_nums = Expts.apply(lambda x : int(re.search('E\d{1,2}', x).group()[1:]) if (type(x)==str and re.search('E\d{1,2}', x) is not None) else -1)
+        dif = np.diff(expt_nums)
+        dif[dif!=0] = 1
+        series_start_inds_auto = np.concat([np.array([0]), np.where(dif)[0] + 1])
+        series_types = np.array(expt_nums.values[series_start_inds_auto])
+        C = [np.cumsum(series_types==s) for s in np.unique(series_types)] # For each series type of type s, compute how many series of type s have been completed by the start of series i 
+        D = [(series_types==tp)*C[t]  for t, tp in enumerate(np.unique(series_types))] # For each series of type s, ignore cumulative sums of number completed series of all other types 
+        S = np.sum(np.array(D), axis=0)
+        Sr = np.nan*np.ones(len(expt_nums))
+        for s, sstart in enumerate(series_start_inds_auto[:-1]):
+            Sr[series_start_inds_auto[s]:series_start_inds_auto[s+1]] = S[s]
+        curr_rows['series_num_auto'] = Sr - 1
+
+        # Use manual series number if possible; otherwise use auto-series number:
+        curr_rows['series_num'] = curr_rows.apply(lambda x : x.series_num_manual if ~np.isnan(x.series_num_manual) else x.series_num_auto, axis=1)
+        curr_rows.index = np.arange(curr_rows.shape[0])
+
+        # Get absolute experiment number of new recording series:
+        series_start_inds = curr_rows[['Expt_num', 'series_num']].drop_duplicates().index
+        
+        # Assign session index within series for each session:
+        Sess = np.nan*np.ones(len(expt_nums))
+        for s, sstart in enumerate(series_start_inds[:-1]):
+            Sess[series_start_inds[s]:series_start_inds[s+1]] = np.arange(series_start_inds[s+1] - series_start_inds[s])
+        curr_rows['series_sess_num'] = Sess
+        
+        Rs.append(curr_rows)
+
+    df_hat = pd.concat(Rs, axis=0)
+
     # Order by monkey and date:
-    df = df.sort_values(by=['monkey', 'date'])
+    df_hat = df_hat.sort_values(by=['monkey', 'date'])
     
-    return df
+    return df_hat
     
 
 
