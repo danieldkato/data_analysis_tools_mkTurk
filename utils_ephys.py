@@ -10,6 +10,7 @@ import matplotlib
 import seaborn as sns
 from utils_code import Config
 
+
 def load_data(n_chan,MUA_dir):
     # loads spike times, peak values of detected spikes, waveform 
     ts_file = next(MUA_dir.glob('ch{:0>3d}_ts.npy'.format(n_chan)))
@@ -264,6 +265,7 @@ def get_data_bl(n_chan, MUA_dir, data_dict_path,stim_info_path, t_before = 0.2, 
 
     return ch_psth_bl, ch_psth_bl_meta,ch_psth_bl_stim
 
+
 def get_data_bysc_all(n_chan, MUA_dir, data_dict_path,save_out_path, t_before = 0.1, t_after = 0.1, binwidth_psth = 0.01):
     ts_file = next(MUA_dir.glob('ch{:0>3d}_ts.npy'.format(n_chan)))
     pk_file =next(MUA_dir.glob('ch{:0>3d}_pks.npy'.format(n_chan)))
@@ -397,6 +399,7 @@ def get_psth_sc_bybehav_allchan(save_out_path):
         filename ='psth_sc'+f'_{b}'
         pickle.dump(psth_all, open(save_out_path /filename,'wb'), protocol = 2)
 
+
 def get_psth_byscenefile_allchans(save_out_path):
     psth = pickle.load(open(os_sorted(save_out_path.glob('ch{:0>3d}_psth_scenefile'.format(0)))[0],'rb'))
     scenefile_unique = list(psth.keys())
@@ -414,6 +417,7 @@ def get_psth_byscenefile_allchans(save_out_path):
                 psth_all.append(psth_mean)
 
         psth_new = np.vstack(psth_all)
+#<<<<<<< HEAD
         pickle.dump(psth_new, open(save_out_path / ('psth_' + Path(s).stem),'wb'),protocol = 2)
         
 def load_kilosort(n_chan, kilosort_dir):
@@ -1236,3 +1240,7 @@ def get_CSD(lfp_allchs, t, Fs, sitespace, stim_info_sess):
     chs_new = np.linspace(bottomch, topch, newcsd.shape[0])
 
     return newcsd, ss_lfp, chs_for_csd
+
+#=======
+#        pickle.dump(psth_new, open(save_out_path / ('psth_' + Path.Path(s).stem),'wb'),protocol = 2)
+#>>>>>>> dan

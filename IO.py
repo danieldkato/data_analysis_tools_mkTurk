@@ -4,16 +4,18 @@ import time
 from pathlib import Path
 import glob
 import h5py
+import glob
 import pickle
 import json
 import warnings
 import re
 import numpy as np
 import pandas as pd
+import json
 from itertools import product
 from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
 from data_analysis_tools_mkTurk.stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
-from data_analysis_tools_mkTurk.npix import get_site_coords, get_sess_metadata_path, extract_imro_table
+from data_analysis_tools_mkTurk.npix import get_sess_metadata_path, extract_imro_table, get_site_coords
 from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
@@ -100,6 +102,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     # Define default preprocessed data path if necessary:
     if preprocessed_data_path is None:
         preprocessed_data_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
+    
+    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
     
     pen_id = preprocessed_data_path.split(os.path.sep)[-1]
     
@@ -1033,7 +1037,7 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
         if is_scene or is_natural_images or is_faces:
         
             # If dealing with scene stimuli:        
-            if is_scene is not None:
+            if is_scene:
                 
                 # Get stim set number:
                 stim_set_str = re.search(scene_regex, scenefile_name).group()
@@ -1057,7 +1061,8 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                     if expt_search is not None:
                         expt_str = expt_search.group()[-2:]
                     else:
-                        raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        warnings.warn('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        return None
                     
                     # Define experiment directory:
                     expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
@@ -1074,9 +1079,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                     expt_dirname = matches[0]
                     expt_directory = os.path.join(monkey_dir, expt_dirname)
                 elif len(matches) < 1:
-                    raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
                 elif len(matches) > 1:
-                    raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
             
                 # Random exception handling:
                 if monkey == 'West':
@@ -1091,9 +1098,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 if len(face_expt_dirs) == 1:
                     expt_dirname = face_expt_dirs[0]
                 elif len(face_expt_dirs) < 1:
-                    raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    warnings.warn('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    return None
                 elif len(face_expt_dirs) > 1:
-                    raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    warnings.warn('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    return None
             
                 expt_directory = os.path.join(monkey_dir, expt_dirname)    
                 

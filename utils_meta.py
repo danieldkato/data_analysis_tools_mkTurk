@@ -9,6 +9,7 @@ from natsort import os_sorted
 import pickle
 import json
 from utils_mkturk import gen_scene_df, gen_short_scene_info
+#from data_analysis_tools_mkTurk.utils_mkturk import * 
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
@@ -134,8 +135,7 @@ def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
-
-    name = Path(data_path).name
+    name = Path.Path(data_path).name
     
     # Define field names and corresponding search patterns:
     patterns = {'hole_id' : '_H\d+\.*\d*_', 
@@ -143,8 +143,8 @@ def get_coords_sess(base_data_path, monkey, date):
                 'AP' : 'AP-{0,1}\d+\.*\d*', 
                 'DV' : 'DV-{0,1}\d+\.*\d*', 
                 'ML' : 'ML-{0,1}\d+\.*\d*', 
-                'Ang'  : '[^H]Ang-*\d+\.*\d', 
-                'HAng' : 'HAng-*\d+\.*\d*'}
+                'Ang'  : '[^H]Ang\d+\.*\d', 
+                'HAng' : 'HAng\d+\.*\d*'}
     regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
@@ -321,6 +321,7 @@ def scenefile2rsvp_inds(data_dicts, scenefile):
 
     return A
 
+
 # read imroTbl 
 def read_imroTbl(meta):
     n_chans = int(meta['nSavedChans'])-1
@@ -337,6 +338,7 @@ def read_imroTbl(meta):
 
     return arr 
 
+
 def read_snsChanMap(meta):
     n_chans = int(meta['nSavedChans'])-1
     snsChanMap = re.findall(r'([0-9]*;[0-9]*:[0-9]*)',
@@ -350,6 +352,7 @@ def read_snsChanMap(meta):
 
     return arr 
 
+
 def get_chanmap(data_path):
     meta_iter = data_path.glob('*ap.meta')
     bin_iter = data_path.glob('*ap.bin')   
@@ -357,6 +360,7 @@ def get_chanmap(data_path):
     bin_path = next(bin_iter) 
 
     meta = readMeta(bin_path)
+
     if ('fileTimeSecs' in meta.keys()): 
         Fs = float(meta['imSampRate'])
         filesize = float(meta['fileSizeBytes'])
@@ -391,3 +395,4 @@ def get_chanmap(data_path):
     imroTbl = read_imroTbl(meta)
 
     return chanmap, imroTbl
+
