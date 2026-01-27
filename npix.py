@@ -1306,6 +1306,7 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
         # Use manual series number if possible; otherwise use auto-series number:
         curr_rows['series_num'] = curr_rows.apply(lambda x : x.series_num_manual if ~np.isnan(x.series_num_manual) else x.series_num_auto, axis=1)
         curr_rows.index = np.arange(curr_rows.shape[0])
+        curr_rows = curr_rows.drop(columns=['series_num_auto', 'series_num_manual']) 
 
         # Get absolute experiment number of new recording series:
         series_start_inds = curr_rows[['Expt_num', 'series_num']].drop_duplicates().index
