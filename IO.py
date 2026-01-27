@@ -265,7 +265,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             output_directory = os.getcwd()
             
         if not os.path.exists(output_directory):
-            Path.Path(output_directory).mkdir(parents=True, exist_ok=True)
+            Path(output_directory).mkdir(parents=True, exist_ok=True)
             
         output_path = os.path.join(output_directory, fname+'.h5') 
         
