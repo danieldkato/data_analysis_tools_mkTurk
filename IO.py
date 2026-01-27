@@ -727,14 +727,16 @@ def standardize_col_types(df):
     # Iterate over columns with multiple types:
     for col in multitype_cols:
         
-        print(col)
-        
         # Get types in current column:
         curr_types = np.unique([str(type(x)) for x in df[col]])
     
         # Define specific fixes for different combinations of types; this part a bit hack-y:
         if "<class 'float'>" in curr_types and "<class 'str'>" in curr_types:
             
+            # Convert str 'true' to 1:
+
+            df.loc[df[col]=='true', col] = 1
+
             # If all floats are NaN, make everything string:
             floats = np.where([type(x)==float for x in df[col]])[0]
             nans = np.where(df[col].isna())[0]
