@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 import glob
 import h5py
@@ -331,6 +332,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             M.add_output(output_path)
             M.add_param('chunk_size', chunk_size)
             M.add_param('dtype', str(dtype))
+            M.date = datetime.now().strftime('%Y-%m-%d')
+            M.time = datetime.now().strftime('%H:%M:%S')
             metadata_path = os.path.join(output_directory, 'chpsths_2_h5.json')
             write_metadata(M, metadata_path, get_checksum=False)
             
