@@ -1293,7 +1293,7 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
         expt_nums = Expts.apply(lambda x : int(re.search('E\d{1,2}', x).group()[1:]) if (type(x)==str and re.search('E\d{1,2}', x) is not None) else -1)
         dif = np.diff(expt_nums)
         dif[dif!=0] = 1
-        series_start_inds_auto = np.concat([np.array([0]), np.where(dif)[0] + 1])
+        series_start_inds_auto = np.concatenate([np.array([0]), np.where(dif)[0] + 1])
         series_types = np.array(expt_nums.values[series_start_inds_auto])
         C = [np.cumsum(series_types==s) for s in np.unique(series_types)] # For each series type of type s, compute how many series of type s have been completed by the start of series i 
         D = [(series_types==tp)*C[t]  for t, tp in enumerate(np.unique(series_types))] # For each series of type s, ignore cumulative sums of number completed series of all other types 
