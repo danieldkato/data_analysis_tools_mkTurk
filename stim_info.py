@@ -584,7 +584,7 @@ def add_cam_azimuth(df):
 
 def sess_meta_dict_2_df(sess_meta_dict):
     
-    cols = ['trial_num', 'rsvp_num', 'reward_bool']
+    cols = ['trial_num', 'rsvp_num', 'reward_bool', 't_on']
     A = [np.array([sess_meta_dict[y][x] for x in cols]).T for y in list(sess_meta_dict.keys())]
     A = np.concatenate(A)
     P = pd.DataFrame(data=A, columns=cols)
