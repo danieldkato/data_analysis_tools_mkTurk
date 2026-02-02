@@ -1529,3 +1529,35 @@ def merge_duplicate_columns(df, output_colname, colname_pattern=None):
     df_out = df_out.drop(columns=matching_cols)
     
     return df_out
+
+
+
+def rel2abs_ind(df, grouping_col, idx_col):
+
+    # Sort groups:
+    df = df.sort_values(by=grouping_col)
+
+    # Find max index within each group:
+    offsets = df[[grouping_col, idx_col]].groupby(grouping_col)[idx_col].max().reset_index(name='max_'+idx_col)
+    offsets['offset'] = [0] + list(offsets.cumsum()['max_'+idx_col].values[:-1]+1) # Compute offset by taking cumulative sum of max indices across groups 
+    
+    df = pd.merge(df, offsets, on=grouping_col)
+    df[idx_col] = df[idx_col] + df['offset']
+    df = df.drop(columns=['max_'+idx_col, 'offset'])
+    
+    return df
+
+
+
+def abs2rel_ind(df, grouping_col, idx_col):
+
+    # Find min index within each group:
+    offsets = df[[grouping_col, idx_col]].groupby(grouping_col)[idx_col].min().reset_index(name='min_'+idx_col)
+    offsets['offset'] = offsets['min_'+idx_col] 
+
+    # Apply offset
+    df = pd.merge(df, offsets, on=grouping_col)
+    df[idx_col] = df[idx_col] - df['offset']
+    df = df.drop(columns=['min_'+idx_col, 'offset'])
+    
+    return df
