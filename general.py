@@ -1532,6 +1532,7 @@ def merge_duplicate_columns(df, output_colname, colname_pattern=None):
 
 
 
+"""
 def rel2abs_ind(df, grouping_col, idx_col, rename_col=False):
 
     # Sort groups:
@@ -1552,6 +1553,7 @@ def rel2abs_ind(df, grouping_col, idx_col, rename_col=False):
     df = df.drop(columns=['max_'+idx_col, 'offset'])
     
     return df
+"""
 
 
 
