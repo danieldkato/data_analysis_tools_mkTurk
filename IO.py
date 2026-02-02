@@ -1207,7 +1207,7 @@ def find_complete_rsvp_slots(bfile):
 
     # Get some scene metadata:
     sample_scenes = bfile['SCENES']['SampleScenes'] 
-    durations = [s['durationMS'] for s in sample_scenes]
+    durations = [s['durationMS'][0] if (type(s['durationMS'])==list and len(s['durationMS'])==1) else s['durationMS'] for s in sample_scenes]
     nstims = [s['nimages'] for s in sample_scenes]
     scene_df = pd.DataFrame(np.array([nstims, durations]).T, columns=['nstim', 'stim_duration'])
     scene_df['scenefile_idx'] = np.arange(scene_df.shape[0])
