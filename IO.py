@@ -1200,4 +1200,76 @@ def stim_idx_2_img_path(sfile_img_dir, stim_idx):
         impath =None
     
     return impath
-        
+
+
+
+def find_complete_rsvp_slots(bfile):
+
+    # Get some scene metadata:
+    sample_scenes = bfile['SCENES']['SampleScenes'] 
+    durations = [s['durationMS'] for s in sample_scenes]
+    nstims = [s['nimages'] for s in sample_scenes]
+    scene_df = pd.DataFrame(np.array([nstims, durations]).T, columns=['nstim', 'stim_duration'])
+    scene_df['scenefile_idx'] = np.arange(scene_df.shape[0])
+
+    # Get single-trial data:
+    trial_df = pd.DataFrame()
+
+    # Get trial timing data: 
+    sample_start_time = np.array(bfile['TRIALEVENTS']['SampleStartTime'])
+    reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
+    reward = np.array(bfile['TRIALEVENTS']['NReward'])
+    trial_df['sample_duration'] = reinforcement_time - sample_start_time
+    trial_df['trial_rewarded'] = reward.astype(bool)
+    trial_df['trial_num'] = np.arange(trial_df.shape[0])
+
+    # Get individual "absolute" stim indices (i.e., index into images pooled across scenefiles):
+    sample_idx_abs = bfile['TRIALEVENTS']['Sample']
+    sample_idx_ar = np.array(list(sample_idx_abs.values()))
+    n_slots = sample_idx_ar.shape[0]
+    stim_cols = ['stim'+str(r) for r in np.arange(n_slots)]
+    for c, col in enumerate(stim_cols):
+        trial_df[col] = sample_idx_ar[c]
+
+    # Get scenefiles of each RSVP slot (should be the same for all slots within a trial):
+    offsets = np.cumsum(scene_df.nstim) - 1
+    get_sfile_index = lambda x : min(np.where(offsets.values >= x)[0])
+    for c, col in enumerate(stim_cols):
+        trial_df['sfile'+str(c)] = list(map(get_sfile_index, trial_df[col].values))
+
+    # Verify that all stim within a trial are from the same scenefile:
+    sfile_cols = [x for x in trial_df.columns if 'sfile' in x]
+    S = np.array(trial_df[sfile_cols])
+    if np.sum(np.ptp(S, axis=1)) != 0:
+        raise AssertionWarning('Images from different scenefiles detected within the same trial.')
+    else:
+        trial_df['scenefile_idx'] = trial_df['sfile0']
+        trial_df = trial_df.drop(columns=sfile_cols)
+
+    # Merge stim duration:
+    trial_df = pd.merge(trial_df, scene_df[['scenefile_idx', 'stim_duration']], on='scenefile_idx')
+
+    # Compute number of completed stim:
+    trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)), axis=1)
+
+    # Expand trials to individual slots:
+    T = []
+    for t in np.arange(n_slots):
+        curr_df = trial_df.copy()
+        curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
+        curr_df['stim_idx'] = trial_df['stim'+str(t)]
+        T.append(curr_df)
+    rsvp_df = pd.concat(T)
+    rsvp_df = rsvp_df.sort_values(by=['trial_num', 'rsvp_num'])
+
+    # Convert "absolute" stim indices to within-scenefile stim index:
+    offsets_hat = np.array([0] + list(offsets.values+1))
+    rsvp_df['stim_idx'] = rsvp_df.apply(lambda x : x.stim_idx - offsets_hat[x.scenefile_idx], axis=1)
+
+    # Determine whether each stim. presentation was successfully fixated through:
+    fixation_broken = rsvp_df.apply(lambda x : x.rsvp_num > x.n_stim_complete or (x.rsvp_num==x.n_stim_complete and ~x.trial_rewarded), axis=1)
+    rsvp_df['stim_completed'] = ~fixation_broken.values.astype(bool)
+
+    # Drop unneeded columns:
+    rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'trial_rewarded']]
+            
