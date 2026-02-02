@@ -1272,4 +1272,6 @@ def find_complete_rsvp_slots(bfile):
 
     # Drop unneeded columns:
     rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'trial_rewarded']]
+
+    return rsvp_df
             
