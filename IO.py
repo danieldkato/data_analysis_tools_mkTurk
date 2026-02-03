@@ -1267,7 +1267,7 @@ def find_complete_rsvp_slots(bfile):
     trial_df = pd.merge(trial_df, scene_df[['scenefile_idx', 'stim_duration']], on='scenefile_idx')
 
     # Compute number of completed stim:
-    trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)), axis=1)
+    trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)) if ~np.isnan(x.sample_duration) else np.nan, axis=1)
 
     # Expand trials to individual slots:
     T = []
