@@ -17,7 +17,7 @@ from itertools import product
 from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
 from data_analysis_tools_mkTurk.stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
 from data_analysis_tools_mkTurk.npix import get_sess_metadata_path, extract_imro_table, get_site_coords
-from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df
+from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -177,8 +177,14 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
         rsvp_dframes = pd.concat(rsvp_dframes_list, axis=0)
 
+    # Merge general trial parameters with THREEJS params from behavior files:
     trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
-    trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)       
+    trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)
+
+    # Merge general trial parameters with whether each RSVP slot was completed:
+    trial_params_df = abs2rel_ind(trial_params_df, grouping_col='behav_file', idx_col='trial_num', rename_col=True)
+    #trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num'])
+    #trial_params_df = trial_params_df.drop(columns='trial_num_rel')
                 
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
