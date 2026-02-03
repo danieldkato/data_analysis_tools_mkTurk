@@ -1323,6 +1323,10 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
 
     # Order by monkey and date:
     df_hat = df_hat.sort_values(by=['monkey', 'date'])
+
+    # Aplit 'AP, DV' column into separate float-valued columns:
+    df_hat.loc[:, 'AP'] = df_hat.apply(lambda x : float(x['AP, DV'].split(',')[0]), axis=1)
+    df_hat.loc[:, 'DV'] = df_hat.apply(lambda x : float(x['AP, DV'].split(',')[1]), axis=1)
     
     return df_hat
     
