@@ -1258,7 +1258,7 @@ def find_complete_rsvp_slots(bfile):
     sfile_cols = [x for x in trial_df.columns if 'sfile' in x]
     S = np.array(trial_df[sfile_cols])
     if np.sum(np.ptp(S, axis=1)) != 0:
-        raise AssertionWarning('Images from different scenefiles detected within the same trial.')
+        raise AssertionError('Images from different scenefiles detected within the same trial.')
     else:
         trial_df['scenefile_idx'] = trial_df['sfile0']
         trial_df = trial_df.drop(columns=sfile_cols)
