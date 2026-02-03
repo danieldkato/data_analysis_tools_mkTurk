@@ -184,9 +184,9 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
     # Merge general trial parameters with whether each RSVP slot was completed:
     trial_params_df = abs2rel_ind(trial_params_df, grouping_col='behav_file', idx_col='trial_num', rename_col=True)
-    trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num'])
+    trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num', 'stim_idx'])
     trial_params_df = trial_params_df.drop(columns='trial_num_rel')
-                
+
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
     # From stim_meta (one value per dict): iti_dur, t_before, t_after 
@@ -199,7 +199,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     
     # Try to get paths to saved images:
     trial_params_df = add_im_full_paths(trial_params_df, base_data_path)
-        
+
     # Copy general timing params to own dict as formal return:
     bin_width = stim_meta[stim_ids[0]]['binwidth'] # < Hack; assuming (probably safely) that same for all stim
     t_before = stim_meta[stim_ids[0]]['t_before'] # < Hack; assuming (probably safely) that same for all stim
@@ -210,7 +210,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_info['t_before'] = t_before
     trial_info['t_after'] = t_after
     #trial_info['trials'] = trial_df
-   
+
     # Create s-by-g matrix specifying which stimulus ids are associated with which 
     # scenefiles, where s is the number of individual stimulus conditions and g
     # is the number of scenefiles sampled in current session; i,j-th element is
@@ -242,7 +242,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
-
     
     # Iterate over channels:
     input_files = []
@@ -274,7 +273,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 # start_idx programmatically. 
                 start_idx = 0
                 spike_counts[cx, start_idx:start_idx+len(curr_data), curr_trial_num, curr_rsvp_num] = curr_data
-     
+
     # Save output if requested: 
     if save_output:
         
