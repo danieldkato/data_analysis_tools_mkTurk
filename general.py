@@ -1569,7 +1569,7 @@ def abs2rel_ind(df, grouping_col, idx_col, rename_col=False):
         output_colname = idx_col
 
     # Apply offset
-    df = pd.merge(df, offsets, on=grouping_col)
+    df = pd.merge(df.drop(columns='offset', errors='ignore'), offsets, on=grouping_col)
     df[output_colname] = df[idx_col] - df['offset']
     df = df.drop(columns=['min_'+idx_col, 'offset'])
     
