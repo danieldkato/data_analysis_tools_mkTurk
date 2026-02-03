@@ -183,8 +183,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
     # Merge general trial parameters with whether each RSVP slot was completed:
     trial_params_df = abs2rel_ind(trial_params_df, grouping_col='behav_file', idx_col='trial_num', rename_col=True)
-    #trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num'])
-    #trial_params_df = trial_params_df.drop(columns='trial_num_rel')
+    trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num'])
+    trial_params_df = trial_params_df.drop(columns='trial_num_rel')
                 
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
