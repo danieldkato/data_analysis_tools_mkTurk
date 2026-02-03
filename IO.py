@@ -173,6 +173,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
             # Find which individual RSVP slots were completed vs. broken fixation during:
             curr_rsvp_dframe = find_complete_rsvp_slots(bfile)
+            curr_rsvp_dframe['behav_file'] = b 
             rsvp_dframes_list.append(curr_rsvp_dframe) 
 
         rsvp_dframes = pd.concat(rsvp_dframes_list, axis=0)
@@ -316,7 +317,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             
             #"""
             # Write truncated dataframe of select trial parameters:
-            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 't_on']
+            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
             if 'img_full_path' in trial_params_df.columns:
                 short_cols.append('img_full_path')
             trial_params_short = trial_params_df[short_cols] 
