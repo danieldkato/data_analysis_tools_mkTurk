@@ -178,8 +178,9 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     # From sess_meta: reward, reward_dur
     trial_params_df['monkey'] = monkey
     trial_params_df['date'] = date
-    trial_params_df['reward_bool'] = sess_meta_df.reward_bool
-    trial_params_df['t_on'] = sess_meta_df.t_on
+    trial_params_df = pd.merge(trial_params_df, sess_meta_df[['trial_num', 'rsvp_num', 'reward_bool', 't_on']], on=['trial_num', 'rsvp_num'])
+    #trial_params_df['reward_bool'] = sess_meta_df.reward_bool
+    #trial_params_df['t_on'] = sess_meta_df.t_on
     
     # Try to get paths to saved images:
     trial_params_df = add_im_full_paths(trial_params_df, base_data_path)
