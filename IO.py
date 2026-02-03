@@ -140,6 +140,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_params_df['stim_idx'] = trial_params_df['stim_idx'].drop(columns='offset')
     
     # Try to retrieve THREEJS params directly from behavior files:
+    rsvp_dframes_list = []
     behav_df = pd.DataFrame()
     sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if pen_id in x]
     if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
@@ -169,6 +170,13 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 curr_sfile_df['scenefile'] = sfile
                 curr_sfile_df['behav_file'] = b
                 behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
+
+            # Find which individual RSVP slots were completed vs. broken fixation during:
+            curr_rsvp_dframe = find_complete_rsvp_slots(bfile)
+            rsvp_dframes_list.append(curr_rsvp_dframe) 
+
+        rsvp_dframes = pd.concat(rsvp_dframes_list, axis=0)
+
     trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
     trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)       
                 
