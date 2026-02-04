@@ -1224,6 +1224,7 @@ def find_complete_rsvp_slots(bfile):
     sample_scenes = bfile['SCENES']['SampleScenes'] 
     durations = [s['durationMS'][0] if (type(s['durationMS'])==list and len(s['durationMS'])==1) else s['durationMS'] for s in sample_scenes]
     nstims = [s['nimages'] for s in sample_scenes]
+    feedback_pre = bfile['TASK']['FeedbackPRE']
     scene_df = pd.DataFrame(np.array([nstims, durations]).T, columns=['nstim', 'stim_duration'])
     scene_df['scenefile_idx'] = np.arange(scene_df.shape[0])
 
@@ -1236,7 +1237,7 @@ def find_complete_rsvp_slots(bfile):
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
-    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time']
+    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre
     trial_df['trial_rewarded'] = reward.astype(bool)
     trial_df['trial_num'] = np.arange(trial_df.shape[0])
 
