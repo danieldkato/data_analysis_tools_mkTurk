@@ -1240,7 +1240,7 @@ def find_complete_rsvp_slots(bfile):
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
-    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre
+    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre + 16 # HACK!!! Hard-coding assumed 16-ms (1-frame) quantization effect; West rewarded RSVP trials have nominal duration of ~884 ms instead of expected 900; single frame drop? 
     trial_df['trial_rewarded'] = reward.astype(bool)
     trial_df['trial_num'] = np.arange(trial_df.shape[0])
 
