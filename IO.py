@@ -1285,7 +1285,7 @@ def find_complete_rsvp_slots(bfile):
     rsvp_df['stim_idx'] = rsvp_df.apply(lambda x : x.stim_idx - offsets_hat[x.scenefile_idx], axis=1)
 
     # Determine whether each stim. presentation was successfully fixated through:
-    fixation_broken = rsvp_df.apply(lambda x : x.rsvp_num > x.n_stim_complete or (x.rsvp_num==x.n_stim_complete and ~x.trial_rewarded), axis=1)
+    fixation_broken = rsvp_df.apply(lambda x : x.rsvp_num > x.n_stim_complete-1 or (x.rsvp_num==x.n_stim_complete-1 and ~x.trial_rewarded), axis=1)
     rsvp_df['stim_completed'] = ~fixation_broken.values.astype(bool)
     rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - x.rsvp_num*x.stim_duration ) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
 
