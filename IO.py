@@ -1256,9 +1256,18 @@ def find_complete_rsvp_slots(bfile):
     offsets = np.cumsum(scene_df.nstim) - 1
     get_sfile_index = lambda x : min(np.where(offsets.values >= x)[0])
     for c, col in enumerate(stim_cols):
-        trial_df['sfile'+str(c)] = list(map(get_sfile_index, trial_df[col].values))
+
+        curr_sfile_colname = 'sfile'+str(c) 
+        trial_df[curr_sfile_colname] = list(map(get_sfile_index, trial_df[col].values))
+        
+        # Merge stim duration for each slot:        
+        trial_df = pd.merge(trial_df, 
+                            scene_df[['scenefile_idx', 'stim_duration']].rename(columns={'scenefile_idx':curr_sfile_colname}), 
+                            on=curr_sfile_colname)\
+                        .rename(columns={'stim_duration':'stim{}_duration'.format(c)})
 
     # Verify that all stim within a trial are from the same scenefile:
+    """"
     sfile_cols = [x for x in trial_df.columns if 'sfile' in x]
     S = np.array(trial_df[sfile_cols])
     if np.sum(np.ptp(S, axis=1)) != 0:
@@ -1266,17 +1275,29 @@ def find_complete_rsvp_slots(bfile):
     else:
         trial_df['scenefile_idx'] = trial_df['sfile0']
         trial_df = trial_df.drop(columns=sfile_cols)
-
-    # Merge stim duration:
-    trial_df = pd.merge(trial_df, scene_df[['scenefile_idx', 'stim_duration']], on='scenefile_idx')
+    """
 
     # Compute number of completed stim:
-    trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)) if ~np.isnan(x.sample_duration) else np.nan, axis=1)
+    dur_cols = [x for x in trial_df.columns if re.search('stim\d{1}_duration', x) is not None]
+    #trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)) if ~np.isnan(x.sample_duration) else np.nan, axis=1)
+    trial_df['n_stim_complete'] = trial_df.apply(lambda x : 
+        max(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0])+1 
+        if len(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0]) > 0 
+        else 0, axis=1)
 
     # Expand trials to individual slots:
+    """
     T = []
     for t in np.arange(n_slots):
         curr_df = trial_df.copy()
+        curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
+        curr_df['stim_idx'] = trial_df['stim'+str(t)]
+        T.append(curr_df)
+    """
+    T = []
+    for t in np.arange(n_slots):
+        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['n_stim_complete', 'stim_duration']
+        curr_df = trial_df.copy()[base_cols + ['stim'+str(t), 'sfile'+str(t)]].rename(columns={'stim'+str(t):'stim_idx', 'sfile'+str(t):'scenefile_idx'})
         curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
         curr_df['stim_idx'] = trial_df['stim'+str(t)]
         T.append(curr_df)
