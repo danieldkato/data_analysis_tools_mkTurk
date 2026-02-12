@@ -1311,7 +1311,8 @@ def find_complete_rsvp_slots(bfile):
     # Determine whether each stim. presentation was successfully fixated through:
     fixation_broken = rsvp_df.apply(lambda x : ~x.trial_rewarded and x.rsvp_num > x.n_stim_complete-1, axis=1)
     rsvp_df['stim_completed'] = ~fixation_broken.values.astype(bool)
-    rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - x.rsvp_num*x.stim_duration ) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
+    rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - np.cumsum()) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
+    #rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - x.rsvp_num*x.stim_duration ) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
 
     # Drop unneeded columns:
     rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'frac_completed', 'trial_rewarded']]
