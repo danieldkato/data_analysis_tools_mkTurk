@@ -10,9 +10,9 @@ import pandas as pd
 import json
 import os
 from sys import platform
-from utils_meta import init_dirs, read_snsChanMap, read_imroTbl
+from .utils_meta import init_dirs, read_snsChanMap, read_imroTbl
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
 def get_psth_objaverse(n_chan: int, monkey: str, date: str):

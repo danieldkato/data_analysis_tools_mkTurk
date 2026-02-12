@@ -1,16 +1,16 @@
 import os
 import concurrent.futures as cf
 
-from analyze_bystim import analyze_bystim
+from .analyze_bystim import analyze_bystim
 
-from allchan_scenefile import allchan_scenefile
-from allchan_bl import allchan_bl
-from allchan_wf import allchan_wf
-from allchan_meanpsth import allchan_meanpsth
-from allchan_objaverse import allchan_objaverse
+from .allchan_scenefile import allchan_scenefile
+from .allchan_bl import allchan_bl
+from .allchan_wf import allchan_wf
+from .allchan_meanpsth import allchan_meanpsth
+from .allchan_objaverse import allchan_objaverse
 
-from get_psth_objaverse import get_psth_objaverse
-from get_wf_features import get_wf_features
+from .get_psth_objaverse import get_psth_objaverse
+from .get_wf_features import get_wf_features
 
 def _combined_template_chan(chan: int, monkey: str, date: str):
     """Process channel glued function: compute PSTH from Objaverse data and extract waveform features."""

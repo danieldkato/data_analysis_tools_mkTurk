@@ -8,7 +8,7 @@ import re
 from natsort import os_sorted
 import pickle
 import json
-from utils_mkturk import gen_scene_df, gen_short_scene_info
+from .utils_mkturk import gen_scene_df, gen_short_scene_info
 #from data_analysis_tools_mkTurk.utils_mkturk import * 
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 

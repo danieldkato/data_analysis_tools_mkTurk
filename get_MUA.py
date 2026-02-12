@@ -2,7 +2,7 @@
 #IMPORTS
 import sys
 import matplotlib.pyplot as plt
-from utils_meta import get_recording_path
+from .utils_meta import get_recording_path
 from pathlib import Path
 import socket 
 host = socket.gethostname()

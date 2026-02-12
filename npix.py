@@ -9,7 +9,6 @@ import pandas as pd
 from numpy.matlib import repmat
 import openpyxl
 import datetime
-from data_analysis_tools_mkTurk.utils_meta import *
 import warnings
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,

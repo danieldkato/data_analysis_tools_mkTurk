@@ -8,9 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import math
 from sys import platform
-from utils_meta import init_dirs
-import matplotlib
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .utils_meta import init_dirs
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def get_wf_features(n_chan: int, monkey: str, date: str):
     """

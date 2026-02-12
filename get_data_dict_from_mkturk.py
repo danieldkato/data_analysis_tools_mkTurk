@@ -5,8 +5,8 @@ import numpy as np
 #import pathlib as Path
 from pathlib import Path
 from natsort import os_sorted
-from utils_mkturk import * 
-from utils_meta import * 
+from .utils_mkturk import * 
+from .utils_meta import * 
 from sys import platform
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta, SampRate, ChannelCountsIM,ChannelCountsNI, makeMemMapRaw, GainCorrectIM, GainCorrectNI, ExtractDigital
 from itertools import groupby

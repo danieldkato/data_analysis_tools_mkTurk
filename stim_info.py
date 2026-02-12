@@ -4,8 +4,8 @@ import re
 import itertools
 import numbers
 from copy import deepcopy
-from data_analysis_tools_mkTurk.utils_mkturk import expand_sess_scenefile2stim
-from data_analysis_tools_mkTurk.general import find_signed_angle
+from .utils_mkturk import expand_sess_scenefile2stim
+from .general import find_signed_angle
 
 def filter_stim_trials(d, filters):
     """
