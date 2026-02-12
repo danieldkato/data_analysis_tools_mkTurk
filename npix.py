@@ -391,7 +391,7 @@ def extract_imro_table(metadata_path):
         
     # Parse line defining IMRO table into a list of strings, each encoding a tuple
     imroTbl_str = imroTbl_lines[0]
-    r = re.search('\(', imroTbl_str).start() # Find index of first open parentheses
+    r = re.search(r'\(', imroTbl_str).start() # Find index of first open parentheses
     imroTbl_str = imroTbl_str[r:] # Retain first open parens and everything after
     tuple_strs = imroTbl_str.split('(')
     tuple_strs = tuple_strs[1:] # Cut off extraneous empty string at beginning
@@ -401,7 +401,7 @@ def extract_imro_table(metadata_path):
     for tx, t in enumerate(tuple_strs):
         
         # Chop off final end parens and anything afterwards (e.g. newline):
-        tail_start = re.search('\)', t).start()
+        tail_start = re.search(r'\)', t).start()
         head = t[0:tail_start]
         
         if tx == 0:
@@ -1234,7 +1234,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
             # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
             for area in areas:
                 tmp = np.array([None]*n_chans)
-                ranges = re.findall('\d{1,3}-\d{1,3}', row[area]) if type(row[area])==str else []
+                ranges = re.findall(r'\d{1,3}-\d{1,3}', row[area]) if type(row[area])==str else []
                 for rn in ranges:
                     bounds = [int(s) for s in rn.split('-')]
                     mn = min(bounds)
@@ -1280,16 +1280,16 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
         curr_rows = df[df.monkey==monkey].copy()
         
         # Get experiment type for each row:
-        Expts = curr_rows.apply(lambda x : re.search('(E|L)\d{1,2}', x.Expt).group() if (type(x.Expt)==str and re.search('(E|L)\d{1,2}', x.Expt) is not None) else None, axis=1)
+        Expts = curr_rows.apply(lambda x : re.search(r'(E|L)\d{1,2}', x.Expt).group() if (type(x.Expt)==str and re.search(r'(E|L)\d{1,2}', x.Expt) is not None) else None, axis=1)
         curr_rows['Expt_num'] = Expts
         curr_rows.loc[curr_rows.apply(lambda x : type(x.Expt_num)==str and  'L' in x.Expt_num, axis=1), 'Expt_num'] = 'E1' # HACK; replace 'L<n>' with 'E1'; switched naming convention at some point
         
         # Try to get manually-entered series number for each row:
-        series_nums_manual = curr_rows.apply(lambda x : int(re.search('_\d{1,2}', x.Expt).group()[-2:]) if (type(x.Expt)==str and re.search('_\d{1,2}', x.Expt) is not None) else None, axis=1)
+        series_nums_manual = curr_rows.apply(lambda x : int(re.search(r'_\d{1,2}', x.Expt).group()[-2:]) if (type(x.Expt)==str and re.search(r'_\d{1,2}', x.Expt) is not None) else None, axis=1)
         curr_rows['series_num_manual'] = series_nums_manual
         
         # Try to automatically get series number for each session: 
-        expt_nums = Expts.apply(lambda x : int(re.search('E\d{1,2}', x).group()[1:]) if (type(x)==str and re.search('E\d{1,2}', x) is not None) else -1)
+        expt_nums = Expts.apply(lambda x : int(re.search(r'E\d{1,2}', x).group()[1:]) if (type(x)==str and re.search(r'E\d{1,2}', x) is not None) else -1)
         dif = np.diff(expt_nums)
         dif[dif!=0] = 1
         series_start_inds_auto = np.concatenate([np.array([0]), np.where(dif)[0] + 1])
@@ -1347,7 +1347,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
 
     # Format dates to yyyymmdd str:
-    dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
+    dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search(r'\d{8}' ,x.date).group(), axis=1)
     sheet.loc[:, 'date'] = dates_fmt
 
     # Optionally apply any additional filters:
@@ -1356,7 +1356,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
     
     # Get brain area names:
     area_cols = [x for x in sheet.columns if 'channel range' in x][:-1]
-    area_names = [re.search('\(\w+\)', a).group()[1:-1] for a in area_cols]
+    area_names = [re.search(r'\(\w+\)', a).group()[1:-1] for a in area_cols]
     
     # Initialize overall dataframe:
     chs_df = pd.DataFrame()
@@ -1373,7 +1373,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
             tmp = np.array([None]*n_chans)        
     
             # Get channel ranges for current area:
-            ranges = re.findall('\d{1,3}-\d{1,3}', row[area_col]) if type(row[area_col])==str else [] 
+            ranges = re.findall(r'\d{1,3}-\d{1,3}', row[area_col]) if type(row[area_col])==str else [] 
             
             # Iterate over channel ranges:
             for rn in ranges:

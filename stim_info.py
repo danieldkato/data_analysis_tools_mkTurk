@@ -176,9 +176,9 @@ def get_polyhaven_views(stimuli):
     views = pd.DataFrame(columns=['environment', 'posX', 'posY', 'posZ', 'pos_str', 'pos_angle', 'targetX', 'targetY', 'targetZ', 'target_str', 'target_angle'])
     
     # Define some useful regular expressions:
-    phaven_regex = '(polyhaven|background)/\d+'
-    cam_pos_regex = 'camera00_posX_-{0,1}\\d+\\.*\\d*_posY_-{0,1}\\d+\\.*\\d*_posZ_-{0,1}\\d+\\.*\\d*'
-    cam_dir_regex = 'targetX_-{0,1}\\d+\\.*\\d*_targetY_-{0,1}\\d+\\.*\\d*_targetZ_-{0,1}\\d+\\.*\\d*'
+    phaven_regex = r'(polyhaven|background)/\d+'
+    cam_pos_regex = r'camera00_posX_-{0,1}\d+\.*\d*_posY_-{0,1}\d+\.*\d*_posZ_-{0,1}\d+\.*\d*'
+    cam_dir_regex = r'targetX_-{0,1}\d+\.*\d*_targetY_-{0,1}\d+\.*\d*_targetZ_-{0,1}\d+\.*\d*'
     
     # Get all polyhaven environments:
     phavens = [re.search(phaven_regex,x).group() for x in stimuli if re.search(phaven_regex,x) is not None]
@@ -373,7 +373,7 @@ def extract_xyz(lookat_str, base_str='pos'):
     coords = []
     for dim in dims:
         
-        regex = '{}{}'.format(base_str, dim) + '_-{0,1}\\d+\\.*\d*'
+        regex = '{}{}'.format(base_str, dim) + r'_-{0,1}\d+\.*\d*'
         matches = re.search(regex, lookat_str).group() # < Assuming unique!
         coord_str = matches[len(base_str)+2:]
         coords.append(float(coord_str))

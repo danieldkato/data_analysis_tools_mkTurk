@@ -863,10 +863,10 @@ def sfile_2_sv_img_dir(sfile_name, base_data_directory=os.path.join('/', 'mnt', 
 def sv_img_dir_2_im_paths(sv_img_dir):
 
     # Select image files:
-    imgs = [x for x in os.listdir(sv_img_dir) if re.search('_index\d+.png', x) is not None]
+    imgs = [x for x in os.listdir(sv_img_dir) if re.search(r'_index\d+.png', x) is not None]
 
     # Extract image indices:
-    img_indices = [int(re.search('_index\d+.png', img).group()[6:][:-4]) for img in imgs] 
+    img_indices = [int(re.search(r'_index\d+.png', img).group()[6:][:-4]) for img in imgs] 
     
     # Create dataframe:
     im_paths_df = pd.DataFrame()
@@ -981,7 +981,7 @@ def find_saved_imgs_dir(trial_params):
         return None
     
     # Try to get stim set number:
-    stim_set_regex = 'neural_stim_\d+_'
+    stim_set_regex = r'neural_stim_\d+_'
     h = lambda x : re.search(stim_set_regex, x)
     stim_sets = [h(x).group()[-2] for x in sfiles if h(x) is not None]
         
@@ -994,7 +994,7 @@ def find_saved_imgs_dir(trial_params):
         return None
         
     # Try to get experiment ID from scenefile ending 'ABCDEFGHIJUVWXYZ_<ID>.json'
-    exp_regex = '[A-Z]{5,}_\d{2,2}.json'
+    exp_regex = r'[A-Z]{5,}_\d{2,2}.json'
     f = lambda x : re.search(exp_regex, x)
     exp_ids = [f(x).group()[-7:-5] for x in sfiles if f(x) is not None]
     
@@ -1047,13 +1047,13 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
     
     ####
 
-    scene_regex = 'neural_stim_\d+'
+    scene_regex = r'neural_stim_\d+'
     if monkey == 'West':
         
         is_scene = re.search(scene_regex, scenefile_name) is not None
         is_natural_images = 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name
         is_faces = 'elias' in scenefile_name or 'neptune' in scenefile_name
-        is_hvm = re.search('hvm\d{2}_\w+_\d{2}_\d{8}', sfile_basename) is not None
+        is_hvm = re.search(r'hvm\d{2}_\w+_\d{2}_\d{8}', sfile_basename) is not None
         
         if is_scene or is_natural_images or is_faces:
         
@@ -1077,7 +1077,7 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 # If stim set is greater than or equal to 5, try to additionally get experiment ID:
                 elif stim_set >= 5:
                     
-                    expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
+                    expt_regex = r'_\d+[A-Z]{3,}\d*_\w{2,2}'
                     expt_search = re.search(expt_regex, scenefile_name)
                     if expt_search is not None:
                         expt_str = expt_search.group()[-2:]
@@ -1172,7 +1172,7 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
         
         # If dealing with scene stimuli:        
         if re.search(scene_regex, scenefile_name) is not None:
-            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+'$', x) is not None]
+            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+r'$', x) is not None]
             if len(matches_sfile_basename) == 1:
                 img_dir = matches_sfile_basename[0]
             elif len(matches_sfile_basename) == 0:

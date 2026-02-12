@@ -21,7 +21,7 @@ def get_recording_path(base_data_path, monkey, date,depth = 4):
     for long_path in long_paths:
         sub_lists = [x[0] for x in os.walk(long_path) if len(Path(x[0]).parents)-len(Path(base_data_path).parents) ==depth]
         for s in sub_lists:
-            result = re.search('\Dep(.*?)\_', Path(s).name)
+            result = re.search(r'\Dep(.*?)\_', Path(s).name)
             if result is not None and 'dk' not in Path(s).name:
                 depth_start = result.group(1).split('-')[0]
                 depth_end = result.group(1).split('-')[1]
@@ -138,13 +138,13 @@ def get_coords_sess(base_data_path, monkey, date):
     name = Path(data_path).name
     
     # Define field names and corresponding search patterns:
-    patterns = {'hole_id' : '_H\d+\.*\d*_', 
-                'penetration' : '_P\d+\.*\d*_', 
-                'AP' : 'AP-{0,1}\d+\.*\d*', 
-                'DV' : 'DV-{0,1}\d+\.*\d*', 
-                'ML' : 'ML-{0,1}\d+\.*\d*', 
-                'Ang'  : '[^H]Ang\d+\.*\d', 
-                'HAng' : 'HAng\d+\.*\d*'}
+    patterns = {'hole_id' : r'_H\d+\.*\d*_', 
+                'penetration' : r'_P\d+\.*\d*_', 
+                'AP' : r'AP-{0,1}\d+\.*\d*', 
+                'DV' : r'DV-{0,1}\d+\.*\d*', 
+                'ML' : r'ML-{0,1}\d+\.*\d*', 
+                'Ang'  : r'[^H]Ang\d+\.*\d', 
+                'HAng' : r'HAng\d+\.*\d*'}
     regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
@@ -152,26 +152,26 @@ def get_coords_sess(base_data_path, monkey, date):
     for idx, row in regex_lut.iterrows():
         matches = re.findall(row.regex, name)
         if len(matches) == 1:
-            val = float(re.search('-{0,1}\d+\.*\d*', matches[0]).group())
+            val = float(re.search(r'-{0,1}\d+\.*\d*', matches[0]).group())
         else:
             val = None
         zero_coord_series[idx] = val
 
     # Find depth (requires separate treatment from other numeric parameters bc
     # filenames include both starting and stop depth):
-    depth_regex = 'Dep\d+-\d+'
+    depth_regex = r'Dep\d+-\d+'
     depth_matches = re.findall(depth_regex, name)
     if len(depth_matches) == 1:
-        depth_vals = re.findall('\d+', depth_matches[0])
+        depth_vals = re.findall(r'\d+', depth_matches[0])
         depth = float(depth_vals[1])
     else:
         depth = None
     zero_coord_series['depth'] = depth
         
     # Find brain hemisphere:
-    hemisphere_str = re.findall('_(L|R)_', name)
+    hemisphere_str = re.findall(r'_(L|R)_', name)
     if len(hemisphere_str) == 1:
-        hemisphere = re.search('(L|R)', hemisphere_str[0]).group()
+        hemisphere = re.search(r'(L|R)', hemisphere_str[0]).group()
     else:
         hemisphere = None
     zero_coord_series['hemisphere'] = hemisphere
@@ -273,7 +273,7 @@ def find_channels(directory, prefix=None):
         prefix = ''
 
     # Define regex:
-    regex = 'ch\d{3}' + prefix
+    regex = r'ch\d{3}' + prefix
 
     # List directory contents:
     filenames = os.listdir(directory)

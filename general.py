@@ -88,9 +88,7 @@ def selectivity_v_coords(base_data_path, monkey, date, class0, class1, inpt_dir=
             
         else:            
             filename_filter = None
-        regex = 'ch'+str(ch).zfill(3) + filename_filter
-    
-    	# Get names of files matching search criteria:
+        regex = r'ch'+str(ch).zfill(3) + filename_filter
         curr_channel_files = [x for x in fnames if re.search(regex,x) is not None]
 
         # Load, stich together contents of matching files:
@@ -1460,11 +1458,11 @@ def find_sess_data_folders(data_root=Path.Path(os.path.join('/', 'mnt', 'smb', '
     
         curr_monkey_df = pd.DataFrame()
         folders = os.listdir(os.path.join(data_root, monkey))
-        sess_regex = monkey + '_\d{8}'
+        sess_regex = monkey + r'_\d{8}'
         sess_folders = np.sort([folder for folder in folders if re.search(sess_regex, folder) is not None])
         sess_folders_full = [os.path.join(data_root, monkey, sess_folder) for sess_folder in sess_folders]
-        dates = [re.search('\d{8}', folder).group() for folder in sess_folders]
-        PXX = [int(re.search('\_P\d+', folder).group()[2:]) for folder in sess_folders]
+        dates = [re.search(r'\d{8}', folder).group() for folder in sess_folders]
+        PXX = [int(re.search(r'\_P\d+', folder).group()[2:]) for folder in sess_folders]
         curr_monkey_df['date'] = dates
         curr_monkey_df['PXX'] = PXX
         curr_monkey_df['path'] = sess_folders_full
