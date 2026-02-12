@@ -1296,7 +1296,7 @@ def find_complete_rsvp_slots(bfile):
     """
     T = []
     for t in np.arange(n_slots):
-        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['n_stim_complete', 'stim_duration']
+        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['n_stim_complete']
         curr_df = trial_df.copy()[base_cols + ['stim'+str(t), 'sfile'+str(t)]].rename(columns={'stim'+str(t):'stim_idx', 'sfile'+str(t):'scenefile_idx'})
         curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
         curr_df['stim_idx'] = trial_df['stim'+str(t)]
