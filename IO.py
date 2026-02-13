@@ -1253,18 +1253,24 @@ def find_complete_rsvp_slots(bfile):
         trial_df[col] = sample_idx_ar[c]
 
     # Get scenefiles of each RSVP slot (should be the same for all slots within a trial):
+    dur_cols = []
     offsets = np.cumsum(scene_df.nstim) - 1
     get_sfile_index = lambda x : min(np.where(offsets.values >= x)[0])
     for c, col in enumerate(stim_cols):
 
         curr_sfile_colname = 'sfile'+str(c) 
+        curr_dur_colname = 'stim{}_duration'.format(c)
+        dur_cols.append(curr_dur_colname)
         trial_df[curr_sfile_colname] = list(map(get_sfile_index, trial_df[col].values))
         
         # Merge stim duration for each slot:        
         trial_df = pd.merge(trial_df, 
                             scene_df[['scenefile_idx', 'stim_duration']].rename(columns={'scenefile_idx':curr_sfile_colname}), 
                             on=curr_sfile_colname)\
-                        .rename(columns={'stim_duration':'stim{}_duration'.format(c)})
+                        .rename(columns={'stim_duration':curr_dur_colname})
+        
+    # Aggregate stimulus durations into single array:
+    trial_df['stim_durs'] = trial_df.apply(lambda x : np.array([0] + [x[col] for col in dur_cols]), axis=1)
 
     # Verify that all stim within a trial are from the same scenefile:
     """"
@@ -1278,7 +1284,7 @@ def find_complete_rsvp_slots(bfile):
     """
 
     # Compute number of completed stim:
-    dur_cols = [x for x in trial_df.columns if re.search('stim\d{1}_duration', x) is not None]
+    #dur_cols = [x for x in trial_df.columns if re.search('stim\d{1}_duration', x) is not None]
     #trial_df['n_stim_complete'] = trial_df.apply(lambda x : int(np.floor(x.sample_duration/x.stim_duration)) if ~np.isnan(x.sample_duration) else np.nan, axis=1)
     trial_df['n_stim_complete'] = trial_df.apply(lambda x : 
         max(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0])+1 
@@ -1296,7 +1302,7 @@ def find_complete_rsvp_slots(bfile):
     """
     T = []
     for t in np.arange(n_slots):
-        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['n_stim_complete']
+        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['stim_durs', 'n_stim_complete']
         curr_df = trial_df.copy()[base_cols + ['stim'+str(t), 'sfile'+str(t)]].rename(columns={'stim'+str(t):'stim_idx', 'sfile'+str(t):'scenefile_idx'})
         curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
         curr_df['stim_idx'] = trial_df['stim'+str(t)]
@@ -1311,10 +1317,11 @@ def find_complete_rsvp_slots(bfile):
     # Determine whether each stim. presentation was successfully fixated through:
     fixation_broken = rsvp_df.apply(lambda x : ~x.trial_rewarded and x.rsvp_num > x.n_stim_complete-1, axis=1)
     rsvp_df['stim_completed'] = ~fixation_broken.values.astype(bool)
-    rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - np.cumsum()) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
+    rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : (x.sample_duration - np.cumsum(x.stim_durs[0:x.n_stim_complete+1])[-1])/x.stim_durs[x.rsvp_num+1] if not x.stim_completed else 1.0, axis=1).values
     #rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : max(0, (x.sample_duration - x.rsvp_num*x.stim_duration ) / x.stim_duration) if not x.stim_completed else 1.0, axis=1).values
 
     # Drop unneeded columns:
+    #rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'trial_rewarded']]
     rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'frac_completed', 'trial_rewarded']]
 
     return rsvp_df
