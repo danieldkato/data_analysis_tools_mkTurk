@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import pickle
@@ -548,6 +549,8 @@ def get_data_dict_from_mkturk(monkey: str, date: str) -> None:
 
 
 if __name__ == '__main__':
-    monkey = sys.argv[2]
-    date = sys.argv[3]
-    get_data_dict_from_mkturk(monkey, date)
+    parser = argparse.ArgumentParser(description='Build data dictionaries aligning mkTurk behavior files with imec trigger data.')
+    parser.add_argument('--monkey', type=str, required=True, help='Monkey identifier (e.g. Butter)')
+    parser.add_argument('--date', type=str, required=True, help='Recording date string (e.g. 20231113)')
+    args = parser.parse_args()
+    get_data_dict_from_mkturk(args.monkey, args.date)

@@ -3,6 +3,7 @@ import sys
 import gc
 import glob
 import time
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -326,6 +327,8 @@ def get_MUA(monkey: str, date: str) -> None:
 
 
 if __name__ == '__main__':
-    monkey = sys.argv[1]
-    date = sys.argv[2]
-    get_MUA(monkey, date)
+    parser = argparse.ArgumentParser(description='Extract MUA from SpikeGLX recordings')
+    parser.add_argument('--monkey', required=True, help='Monkey identifier (e.g. Butter)')
+    parser.add_argument('--date', required=True, help='Recording date (e.g. 20231113)')
+    args = parser.parse_args()
+    get_MUA(args.monkey, args.date)
