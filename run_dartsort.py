@@ -316,4 +316,4 @@ if __name__ == '__main__':
     parser.add_argument('--date', type=str, required=True, help='Recording date (YYYYMMDD)')
     args = parser.parse_args()
 
-    # run_dartsort(args.monkey, args.date)
+    run_dartsort(args.monkey, args.date)
