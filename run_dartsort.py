@@ -223,7 +223,7 @@ def get_initial_detections(output_path: Path, rec: si.BaseRecording) -> DARTsort
     return initial_detections
 
 EXPECTED_OUTPUT_FILES = [
-    'subtraction.h5', 'geom.npy', 'bad_channels.npy', 'times_samples.npy',
+    'geom.npy', 'bad_channels.npy', 'times_samples.npy',
     'channels.npy', 'channel_index.npy', 'denoised_ptp_amplitudes.npy',
     'denoised_ptp_amplitude_vectors.npy', 'point_source_localizations.npy',
     'denoised_logpeaktotrough.npy', 'max_channels_registered.npy', 'motion_est.pkl',
@@ -306,6 +306,12 @@ def run_dartsort(monkey: str, date: str) -> None:
     logger.info("Plots completed")
 
     logger.info("Pipeline finished")
+    
+    if is_session_complete(output_path):
+        logger.info(f"Session successfully completed: {monkey} {date}")
+        (output_path / "substraction.h5").unlink(missing_ok=True)  # Remove large intermediate file to save space
+    else:
+        logger.warning(f"Session completed but some output files are missing: {monkey} {date}")
 
 
 
