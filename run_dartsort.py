@@ -279,14 +279,18 @@ def run_dartsort(monkey: str, date: str) -> None:
     plot_traces(rec, plot_save_out_path)
     logger.info("Trace plot completed")
 
-    try:
-        rec = stage_recording_locally(rec, data_path)
-        logger.info("Local staging completed")
+    if (output_path / "subtraction.h5").exists():
         initial_detections = get_initial_detections(output_path, rec)
-        logger.info("Spike subtraction completed")
-    finally:
-        cleanup_local_staging()
-        logger.info("Local staging cleanup completed")
+        logger.info("Subtraction results already exist, skipping subtraction step")
+    else: 
+        try:
+            rec = stage_recording_locally(rec, data_path)
+            logger.info("Local staging completed")
+            initial_detections = get_initial_detections(output_path, rec)
+            logger.info("Spike subtraction completed")
+        finally:
+            cleanup_local_staging()
+            logger.info("Local staging cleanup completed")
 
     motion_est = run_registration(initial_detections, rec)
     logger.info("Motion registration completed")
@@ -309,7 +313,7 @@ def run_dartsort(monkey: str, date: str) -> None:
     
     if is_session_complete(output_path):
         logger.info(f"Session successfully completed: {monkey} {date}")
-        (output_path / "substraction.h5").unlink(missing_ok=True)  # Remove large intermediate file to save space
+        (output_path / "subtraction.h5").unlink(missing_ok=True)  # Remove large intermediate file to save space
     else:
         logger.warning(f"Session completed but some output files are missing: {monkey} {date}")
 
