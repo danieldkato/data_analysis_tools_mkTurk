@@ -1402,3 +1402,69 @@ def split_ap_dv_coords(s, idx, delimiter=','):
     except:
         part = None
     return part
+
+
+
+def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')):
+    """
+    Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
+    """
+
+    # Read CSV:
+    df = pd.read_csv(csv_path)
+
+    cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id'])))
+    cluster_labels = [x[:-4] for x in cluster_label_cols]
+
+    # Iterate over sessions:
+    dfs = []
+    for r, row in df.iterrows():
+        
+        # Initialize dataframe for current session:
+        curr_df = pd.DataFrame()
+
+        # Get cluster IDs for current session:
+        cluster_ids_str = row.cluster_id
+        cluster_ids_cropped = cluster_ids_str[1:-1]
+        cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
+        curr_df['cluster_id'] = cluster_ids
+        curr_df['ch_idx_glx'] = np.arange(curr_df.shape[0])
+
+        # Try to assign cluster labels:
+        curr_df['cluster_label'] = None
+        for c, col in enumerate(cluster_label_cols):
+            curr_cluster_label = cluster_labels[c]
+            
+            curr_inds_str = row[col]
+            curr_inds_cropped = curr_inds_str[1:-1]
+
+            # If no channels of current cluster, move to next cluster: 
+            if curr_inds_cropped == '':
+                continue
+            
+            curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
+            curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
+
+        # Get session metadata:
+        monkey = re.search('[a-zA-Z]{1,}', row.session).group()
+        date = re.search('\d{8}', row.session).group()
+        curr_df['monkey'] = monkey
+        curr_df['date'] = date
+        dfs.append(curr_df)
+
+    # Concatenate cluster labels across sessions:
+    df_out = pd.concat(dfs, axis=0)
+
+    # Try to retrieve some metadata for latest version of CSV file: 
+    csv_meta = dict()
+
+    mtime = os.path.getmtime(cluster_ids_path)
+    mtime_datetime = datetime.datetime.fromtimestamp(mtime)
+    date_str = mtime_datetime.strftime('%Y%m%d')
+    time_str = mtime_datetime.strftime('%H:%M:%S')
+
+    csv_meta['path'] = cluster_ids_path
+    csv_meta['date'] = date_str
+    csv_meta['time'] = time_str
+
+    return df_out, csv_meta
