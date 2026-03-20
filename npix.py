@@ -1458,12 +1458,12 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     # Try to retrieve some metadata for latest version of CSV file: 
     csv_meta = dict()
 
-    mtime = os.path.getmtime(cluster_ids_path)
+    mtime = os.path.getmtime(csv_path)
     mtime_datetime = datetime.datetime.fromtimestamp(mtime)
     date_str = mtime_datetime.strftime('%Y%m%d')
     time_str = mtime_datetime.strftime('%H:%M:%S')
 
-    csv_meta['path'] = cluster_ids_path
+    csv_meta['path'] = csv_path
     csv_meta['date'] = date_str
     csv_meta['time'] = time_str
 
