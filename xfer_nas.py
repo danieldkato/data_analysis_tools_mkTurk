@@ -122,25 +122,36 @@ def transfer_to_server(host, username, password, folders, destination):
 MAX_WORKERS = 6  # adjust (4–10 is usually good)
 
 
-def collect_matching_files(sftp, remote_path, subject, date, patterns, results):
-    """Recursively collect matching file paths."""
-    try:
-        for entry in sftp.listdir_attr(remote_path):
-            name = entry.filename
-            full_path = f"{remote_path}/{name}"
+def fast_collect_matching_files(sftp, subject, dates, patterns):
+    """Single-pass optimized scan."""
+    results = []
 
-            if "dk_g" in name:
-                continue
+    def walk(remote_path):
+        try:
+            for entry in sftp.listdir_attr(remote_path):
+                name = entry.filename
+                full_path = f"{remote_path}/{name}"
 
-            if stat.S_ISDIR(entry.st_mode):
-                if subject in name and date in name:
-                    collect_all_files(sftp, full_path, patterns, results)
-                else:
-                    collect_matching_files(
-                        sftp, full_path, subject, date, patterns, results
-                    )
-    except Exception:
-        pass
+                # 🚫 Skip unwanted dirs early
+                if "dk_g" in name:
+                    continue
+
+                if stat.S_ISDIR(entry.st_mode):
+                    # 🚀 PRUNE: skip dirs that clearly don't match
+                    if subject not in name and remote_path != "/":
+                        continue
+
+                    # ✅ Check if this is a target folder
+                    if subject in name and any(date in name for date in dates):
+                        collect_all_files(sftp, full_path, patterns, results)
+                    else:
+                        walk(full_path)
+
+        except Exception:
+            pass
+
+    walk("/")
+    return results
 
 
 def collect_all_files(sftp, remote_path, patterns, results):
@@ -170,44 +181,65 @@ def find_local_destination(subject, date):
         print(f"Error: subject folder not found: {subject_dir}")
         sys.exit(1)
 
-    # Step 1: find candidate parent folders (subject + date)
-    parent_matches = [
-        p for p in subject_dir.rglob("*")
-        if (
-            p.is_dir()
-            and subject in p.name
-            and date in p.name
-            and "dk_g" not in p.name
-            and "long_cr_maps" not in p.name
-        )
-    ]
+    matches = []
 
-    if not parent_matches:
-        print(f"Error: no parent folders found for {subject} {date}")
-        sys.exit(1)
+    def walk(path):
+        try:
+            for entry in path.iterdir():
+                name = entry.name
 
-    # Step 2: recursively search inside those for imec0 folders
-    final_matches = []
-    for parent in parent_matches:
-        for p in parent.rglob("*"):
-            if (
-                p.is_dir()
-                and "imec0" in p.name
-                and "dk_g" not in p.name
-            ):
-                final_matches.append(p.resolve())
-    final_matches = list(set(final_matches))  # remove duplicates if any
+                # 🚫 prune early
+                if "dk_g" in name:
+                    continue
 
-    if len(final_matches) == 1:
-        return final_matches[0]
+                if not entry.is_dir():
+                    continue
 
-    elif len(final_matches) == 0:
+                # 🚀 Only descend into relevant branches
+                if subject not in name and date not in name:
+                    continue
+
+                # ✅ Found candidate parent
+                if subject in name and date in name:
+                    find_imec0(entry)
+                else:
+                    walk(entry)
+
+        except Exception:
+            pass
+
+    def find_imec0(path):
+        """Search for imec0 dirs under a matched parent."""
+        try:
+            for entry in path.iterdir():
+                name = entry.name
+
+                if "dk_g" in name:
+                    continue
+
+                if not entry.is_dir():
+                    continue
+
+                if "imec0" in name:
+                    matches.append(entry.resolve())
+                else:
+                    find_imec0(entry)
+
+        except Exception:
+            pass
+
+    walk(subject_dir)
+
+    if len(matches) == 1:
+        return matches[0]
+
+    elif len(matches) == 0:
         print(f"Error: no imec0 folders found under {subject} {date}")
         sys.exit(1)
 
     else:
         print(f"Error: multiple imec0 folders found under {subject} {date}:")
-        for m in final_matches:
+        for m in matches:
             print(m)
         sys.exit(1)
         
@@ -281,16 +313,23 @@ def download_from_server(host, username, password, subject, dates, patterns):
         results = []
 
         # Map each file → correct local directory
+        print(f"[{host}] Scanning for files (optimized)...")
+
+        remote_files = fast_collect_matching_files(
+            sftp,
+            subject,
+            dates,
+            patterns
+        )
+
+        # Map files → correct local directories
         file_map = []
-
-        for date in dates:
-            local_dir = find_local_destination(subject, date)
-
-            temp_results = []
-            collect_matching_files(sftp, "/", subject, date, patterns, temp_results)
-
-            for path in temp_results:
-                file_map.append((path, local_dir))
+        for remote_path in remote_files:
+            for date in dates:
+                if date in remote_path:
+                    local_dir = find_local_destination(subject, date)
+                    file_map.append((remote_path, local_dir))
+                    break
 
         sftp.close()
         transport.close()
