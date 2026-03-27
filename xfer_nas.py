@@ -162,15 +162,86 @@ def collect_all_files(sftp, remote_path, patterns, results):
         pass
 
 
-def download_worker(host, username, password, remote_path):
-    """Each worker creates its own connection."""
+def find_local_destination(subject, date):
+    base_dir = Path("/mnt/smb/locker/issa-locker/Data")
+    subject_dir = base_dir / subject
+
+    if not subject_dir.exists():
+        print(f"Error: subject folder not found: {subject_dir}")
+        sys.exit(1)
+
+    # Step 1: find candidate parent folders (subject + date)
+    parent_matches = [
+        p for p in subject_dir.rglob("*")
+        if (
+            p.is_dir()
+            and subject in p.name
+            and date in p.name
+            and "dk_g" not in p.name
+            and "long_cr_maps" not in p.name
+        )
+    ]
+
+    if not parent_matches:
+        print(f"Error: no parent folders found for {subject} {date}")
+        sys.exit(1)
+
+    # Step 2: recursively search inside those for imec0 folders
+    final_matches = []
+    for parent in parent_matches:
+        for p in parent.rglob("*"):
+            if (
+                p.is_dir()
+                and "imec0" in p.name
+                and "dk_g" not in p.name
+            ):
+                final_matches.append(p.resolve())
+    final_matches = list(set(final_matches))  # remove duplicates if any
+
+    if len(final_matches) == 1:
+        return final_matches[0]
+
+    elif len(final_matches) == 0:
+        print(f"Error: no imec0 folders found under {subject} {date}")
+        sys.exit(1)
+
+    else:
+        print(f"Error: multiple imec0 folders found under {subject} {date}:")
+        for m in final_matches:
+            print(m)
+        sys.exit(1)
+        
+        
+def get_safe_local_path(local_dir, filename):
+    """Return a non-overwriting file path by appending suffix if needed."""
+    base = Path(local_dir) / filename
+
+    if not base.exists():
+        return base
+
+    stem = base.stem
+    suffix = base.suffix
+    counter = 1
+
+    while True:
+        new_path = base.with_name(f"{stem}_{counter}{suffix}")
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+
+def download_worker(host, username, password, remote_path, local_dir):
     try:
         transport = paramiko.Transport((host, 22))
         transport.connect(username=username, password=password)
         sftp = paramiko.SFTPClient.from_transport(transport)
 
         filename = os.path.basename(remote_path)
-        local_path = Path(".") / filename
+
+        # ✅ Prevent overwrite
+        local_path = local_dir / filename
+        if local_path.exists():
+            return f"[{host}] Skipped (exists): {filename}"
 
         file_size = sftp.stat(remote_path).st_size
 
@@ -178,7 +249,7 @@ def download_worker(host, username, password, remote_path):
             total=file_size,
             unit="B",
             unit_scale=True,
-            desc=f"{host}:{filename}",
+            desc=f"{host}:{local_path.name}",
             leave=False,
         ) as pbar:
 
@@ -190,10 +261,13 @@ def download_worker(host, username, password, remote_path):
         sftp.close()
         transport.close()
 
-        return f"[{host}] Done: {filename}"
+        if local_path.name != filename:
+            return f"[{host}] Saved as {local_path.name} (avoided overwrite)"
+        else:
+            return f"[{host}] Done: {filename}"
 
     except Exception as e:
-        return f"[{host}] Error: {remote_path} ({e})"
+        return f"[{host}] Error: {remote_path} ({e})"   
 
 
 def download_from_server(host, username, password, subject, dates, patterns):
@@ -205,22 +279,39 @@ def download_from_server(host, username, password, subject, dates, patterns):
         print(f"[{host}] Scanning for files...")
 
         results = []
+
+        # Map each file → correct local directory
+        file_map = []
+
         for date in dates:
-            collect_matching_files(sftp, "/", subject, date, patterns, results)
+            local_dir = find_local_destination(subject, date)
+
+            temp_results = []
+            collect_matching_files(sftp, "/", subject, date, patterns, temp_results)
+
+            for path in temp_results:
+                file_map.append((path, local_dir))
 
         sftp.close()
         transport.close()
 
-        if not results:
+        if not file_map:
             print(f"[{host}] No matching files found.")
             return
 
-        print(f"[{host}] Found {len(results)} files. Starting parallel download...")
+        print(f"[{host}] Found {len(file_map)} files. Starting parallel download...")
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = [
-                executor.submit(download_worker, host, username, password, path)
-                for path in results
+                executor.submit(
+                    download_worker,
+                    host,
+                    username,
+                    password,
+                    remote_path,
+                    local_dir
+                )
+                for remote_path, local_dir in file_map
             ]
 
             for future in as_completed(futures):
