@@ -55,6 +55,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+LOCAL_STAGING_ROOT = Path("/local")
+
 
 def resolve_dartsort_path(monkey: str, date: str) -> tuple[Path, Path, Path, Path]:
     """Resolve data, save, and plot paths for a given monkey/date session."""
@@ -223,7 +225,7 @@ def get_initial_detections(output_path: Path, rec: si.BaseRecording) -> DARTsort
     return initial_detections
 
 EXPECTED_OUTPUT_FILES = [
-    'geom.npy', 'bad_channels.npy', 'times_samples.npy',
+    'geom.npy', 'times_samples.npy',
     'channels.npy', 'channel_index.npy', 'denoised_ptp_amplitudes.npy',
     'denoised_ptp_amplitude_vectors.npy', 'point_source_localizations.npy',
     'denoised_logpeaktotrough.npy', 'max_channels_registered.npy', 'motion_est.pkl',
@@ -241,35 +243,39 @@ def is_session_complete(output_path: Path) -> bool:
     return True
 
 def stage_recording_locally(rec: si.BaseRecording, data_path: Path) -> si.BaseRecording:
-    """Save preprocessed recording to local /tmp for fast I/O during subtraction."""
+    """Save preprocessed recording to local staging for fast I/O during subtraction."""
     n_cpus, _ = detect_compute_resources()
     job_id = os.environ.get('SLURM_JOB_ID', os.getpid())
-    local_dir = Path(f"/tmp/dartsort_{job_id}") / data_path.name / "rec_ppx"
+    local_dir = LOCAL_STAGING_ROOT / f"dartsort_{job_id}" / data_path.name / "rec_ppx"
     if local_dir.exists():
         logger.info(f"Loading existing local cache: {local_dir}")
         return si.read_binary_folder(local_dir)
-    local_dir.parent.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Staging preprocessed recording to {local_dir}")
-    rec = rec.save(folder=local_dir, n_jobs=n_cpus, chunk_duration="1s", dtype="float16")
-    logger.info(f"Staging complete: {local_dir}")
+    try:
+        local_dir.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Staging preprocessed recording to {local_dir}")
+        rec = rec.save(folder=local_dir, n_jobs=n_cpus, chunk_duration="1s", dtype="float16")
+        logger.info(f"Staging complete: {local_dir}")
+    except OSError as e:
+        logger.warning(f"Local staging failed ({e}) — running directly from network path")
+        shutil.rmtree(local_dir, ignore_errors=True)
     return rec
 
 def cleanup_local_staging() -> None:
-    """Remove local /tmp staging directory for this job."""
+    """Remove local staging directory for this job."""
     job_id = os.environ.get('SLURM_JOB_ID', os.getpid())
-    local_dir = Path(f"/tmp/dartsort_{job_id}")
+    local_dir = LOCAL_STAGING_ROOT / f"dartsort_{job_id}"
     if local_dir.exists():
         shutil.rmtree(local_dir)
         logger.info(f"Cleaned up local staging: {local_dir}")
 
-def run_dartsort(monkey: str, date: str) -> None:
+def run_dartsort(monkey: str, date: str, override: bool = False) -> None:
     """Run full dartsort pipeline: preprocess, subtract, save, register, and plot."""
     logger.info(f"Starting dartsort pipeline for {monkey} {date}")
 
     data_path, save_out_path, plot_save_out_path, output_path = resolve_dartsort_path(monkey, date)
     logger.info(f"Resolved paths: data={data_path}, save_out={save_out_path}, plot_save_out={plot_save_out_path}")
 
-    if is_session_complete(output_path):
+    if is_session_complete(output_path) and not override:
         logger.info(f"Session already complete, skipping {monkey} {date}")
         return
 
@@ -279,7 +285,7 @@ def run_dartsort(monkey: str, date: str) -> None:
     plot_traces(rec, plot_save_out_path)
     logger.info("Trace plot completed")
 
-    if (output_path / "subtraction.h5").exists():
+    if (output_path / "subtraction.h5").exists() and not override:
         initial_detections = get_initial_detections(output_path, rec)
         logger.info("Subtraction results already exist, skipping subtraction step")
     else: 
@@ -324,6 +330,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run DARTsort spike sorting pipeline')
     parser.add_argument('--monkey', type=str, required=True, help='Monkey name')
     parser.add_argument('--date', type=str, required=True, help='Recording date (YYYYMMDD)')
+    parser.add_argument('--override', action='store_true', help='Override existing outputs and rerun entire pipeline')
     args = parser.parse_args()
 
-    run_dartsort(args.monkey, args.date)
+    run_dartsort(args.monkey, args.date, override=args.override)
