@@ -1414,6 +1414,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     df = pd.read_csv(csv_path)
 
     cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id'])))
+    cluster_label_cols = [c for c in cluster_label_cols if 'filtered' not in c]
     cluster_labels = [x[:-4] for x in cluster_label_cols]
 
     # Iterate over sessions:
