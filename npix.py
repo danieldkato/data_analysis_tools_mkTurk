@@ -1405,7 +1405,7 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 
 
 
-def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')):
+def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
     """
@@ -1415,6 +1415,8 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
 
     cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id'])))
     cluster_label_cols = [c for c in cluster_label_cols if 'filtered' not in c]
+    if filtered:
+        cluster_label_cols = [x + '_filtered' for x in cluster_label_cols]
     cluster_labels = [x[:-4] for x in cluster_label_cols]
 
     # Iterate over sessions:
