@@ -1143,7 +1143,10 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         
         areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
         wkbkb_df['areas'] = areas_hat_b
-        
+
+        chs_df["areas_x"] = chs_df["areas_x"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
+        chs_df["areas_y"] = chs_df["areas_y"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
+
         # Merge area labels:
         A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
         chs_df['areas'] = A
