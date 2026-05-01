@@ -1238,11 +1238,15 @@ def find_complete_rsvp_slots(bfile):
     trial_df = pd.DataFrame()
 
     # Get trial timing data: 
+    start_time = np.array(bfile['TRIALEVENTS']['StartTime'])
     sample_start_time = np.array(bfile['TRIALEVENTS']['SampleStartTime'])
     reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
+    end_time = np.array(bfile['TRIALEVENTS']['EndTime'])
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
+    trial_df['start_time'] = sample_start_time
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
+    trial_df['end_time'] = end_time
     trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre + 16 # HACK!!! Hard-coding assumed 16-ms (1-frame) quantization effect; West rewarded RSVP trials have nominal duration of ~884 ms instead of expected 900; single frame drop? 
     trial_df['trial_rewarded'] = reward.astype(bool)
     trial_df['trial_num'] = np.arange(trial_df.shape[0])
@@ -1302,7 +1306,7 @@ def find_complete_rsvp_slots(bfile):
     rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : (x.sample_duration - np.cumsum(x.stim_durs[0:x.n_stim_complete+1])[-1])/x.stim_durs[x.rsvp_num+1] if not x.stim_completed else 1.0, axis=1).values
 
     # Drop unneeded columns:
-    rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'frac_completed', 'trial_rewarded']]
+    rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'frac_completed', 'trial_rewarded', 'start_time', 'sample_start_time', 'reinforcement_time', 'end_time']]
 
     return rsvp_df
             
