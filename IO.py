@@ -173,6 +173,9 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
             # Find which individual RSVP slots were completed vs. broken fixation during:
             curr_rsvp_dframe = find_complete_rsvp_slots(bfile)
+            curr_rsvp_dframe['StartTime'] = bfile['TRIALEVENTS']['StartTime']
+            curr_rsvp_dframe['ReinforcementTime'] = bfile['TRIALEVENTS']['ReinforcementTime']
+            curr_rsvp_dframe['EndTime'] = bfile['TRIALEVENTS']['EndTime']
             curr_rsvp_dframe['behav_file'] = b 
             rsvp_dframes_list.append(curr_rsvp_dframe) 
 
