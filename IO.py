@@ -1239,7 +1239,7 @@ def find_complete_rsvp_slots(bfile):
     reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
     end_time = np.array(bfile['TRIALEVENTS']['EndTime'])
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
-    trial_df['start_time'] = sample_start_time
+    trial_df['start_time'] = start_time
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
     trial_df['end_time'] = end_time
