@@ -341,7 +341,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     # Save as pandas dataframe:
     coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
-    coords_df['bank'] = B
+    coords_df['bank'] = Banks
     coords_df['ap'] = Coords[:,0]
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]    
