@@ -269,7 +269,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         curr_coords_df['date'] = zero_coords.date
         chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
     
-    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
@@ -339,8 +339,9 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'], index=Chs)
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
+    coords_df['bank'] = B
     coords_df['ap'] = Coords[:,0]
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]    
@@ -349,7 +350,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
-    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
