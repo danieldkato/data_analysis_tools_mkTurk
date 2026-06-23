@@ -12,13 +12,14 @@ MONKEY="Bourgeois"
 DATE="20260217"
 
 SCRIPT_DIR="/home/yy3658/helpers/data_analysis_tools_mkTurk"  # TODO: change to your path to data_analysis_tools_mkTurk
+SORTING_DIR="$SCRIPT_DIR/spike_sorting"  # spike-sorting pipelines + job scripts
 
 echo "=== Starting Preprocessing Pipeline ==="
 echo "Monkey: $MONKEY, Date: $DATE"
 
 # Submit dartsort job with parameters (GPU-intensive, runs in parallel)
 echo "Submitting DARTsort job..."
-sbatch --export=ALL,MONKEY="$MONKEY",DATE="$DATE",SCRIPT_DIR="$SCRIPT_DIR" "$SCRIPT_DIR/run_dartsort.sh"
+sbatch --export=ALL,MONKEY="$MONKEY",DATE="$DATE",SCRIPT_DIR="$SCRIPT_DIR" "$SORTING_DIR/run_dartsort.sh"
 
 echo "Running MUA extraction..."
 python "$SCRIPT_DIR/get_MUA.py" --monkey "$MONKEY" --date "$DATE"
