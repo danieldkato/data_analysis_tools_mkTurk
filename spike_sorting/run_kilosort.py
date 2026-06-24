@@ -199,6 +199,60 @@ def _nsavedchans_from_meta(bin_path) -> int:
     raise ValueError(f"nSavedChans not found in {meta}")
 
 
+def export_spike_times_per_unit(monkey: str, date: str, samp_rate: int = 30000,
+                                overwrite: bool = False) -> None:
+    """Prepare a session's Kilosort4 output for analyze_bystim(source='kilosort').
+
+    From the raw KS4 output, builds the two inputs the kilosort PSTH analysis reads:
+      - <engram_rec_dir>/kilosort4/spike_times_perunit/clu_{nnn}_st.npy : per-unit spike
+        times (seconds), split from the flat spike_times.npy / spike_clusters.npy.
+      - <save_out_path>/kilosort4/KSLabel.npy : per-template label array, used to
+        enumerate units.
+
+    overwrite=False skips sessions that already have spike_times_perunit populated.
+    Run after run_kilosort has produced the kilosort4/ output for the session.
+    """
+    import pandas as pd
+
+    # One session per (monkey, date). _resolve_session_paths raises on multiple/none
+    # and descends into the SpikeGLX run folder (so kilosort4/ sits beside the .ap.meta).
+    engram_rec_dir, save_out_path, _, _ = _resolve_session_paths(monkey, date)
+    ks_data_dir = engram_rec_dir / 'kilosort4'
+    ks_out_dir = Path(save_out_path) / 'kilosort4'
+    perunit_dir = ks_data_dir / 'spike_times_perunit'
+
+    if not ks_data_dir.exists():
+        raise FileNotFoundError(f"no raw kilosort4 output at {ks_data_dir}; run run_kilosort first")
+
+    already = sorted(perunit_dir.glob('clu_*_st.npy')) if perunit_dir.exists() else []
+    if already and not overwrite:
+        logger.info(f"{perunit_dir} already has {len(already)} unit files, "
+                    f"skipping (overwrite=False)")
+        return
+
+    spike_times = np.load(ks_data_dir / 'spike_times.npy')
+    spike_clusters = np.squeeze(np.load(ks_data_dir / 'spike_clusters.npy'))
+    cluster_ids = np.unique(spike_clusters)
+
+    # Build KSLabel: one entry per template index, filled from cluster_KSLabel.tsv.
+    cluster_KSLabel = pd.read_csv(ks_data_dir / 'cluster_KSLabel.tsv', sep='\t')
+    n_templates = int(cluster_ids.max()) + 1
+    KSLabel = np.full(n_templates, '', dtype=object)
+    KSLabel[cluster_ids] = np.squeeze(np.array(
+        [cluster_KSLabel[cluster_KSLabel['cluster_id'] == c]['KSLabel'].values for c in cluster_ids]
+    ))
+    ks_out_dir.mkdir(parents=True, exist_ok=True)
+    np.save(ks_out_dir / 'KSLabel.npy', KSLabel)
+    logger.info(f"wrote {ks_out_dir / 'KSLabel.npy'} ({len(KSLabel)} units)")
+
+    # Split spike times per unit (seconds).
+    perunit_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(len(KSLabel)):
+        np.save(perunit_dir / 'clu_{:0>3d}_st.npy'.format(i),
+                spike_times[spike_clusters == i] / samp_rate)
+    logger.info(f"wrote per-unit spike times to {perunit_dir}")
+
+
 def run_kilosort(monkey: str, date: str, dredge: bool = True, override: bool = False,
                  stage_local: bool = True) -> None:
     """Run the full Kilosort4 pipeline: preprocess, stage, sort, clean up.
@@ -360,6 +414,9 @@ def run_kilosort(monkey: str, date: str, dredge: bool = True, override: bool = F
 
     if is_session_complete(out_dir):
         logger.info(f"Session successfully completed: {monkey} {date}")
+        # Export per-unit spike times + KSLabel for analyze_bystim(source='kilosort').
+        # Done after staging cleanup, only on a complete sort.
+        export_spike_times_per_unit(monkey, date, override=override)
     else:
         logger.warning(f"Session completed but some output files are missing: {monkey} {date}")
 
