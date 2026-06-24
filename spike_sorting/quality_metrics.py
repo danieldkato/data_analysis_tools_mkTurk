@@ -376,17 +376,18 @@ def load_good_unit_mask(monkey: str, date: str, strict: bool = True,
                         require_single_unit: bool = True) -> np.ndarray:
     """Load a session's saved metrics and return the is_good_unit boolean mask.
 
-    Convenience wrapper: reads presence_ratios / amplitude_cutoffs / viol_rates from
-    the save-out kilosort4/ folder, derives fr / contamPct / KSLabel from the raw KS4
-    output, and applies is_good_unit. Run run_quality_metrics first.
+    Convenience wrapper: reads presence_ratios / amplitude_cutoffs / viol_rates / fr /
+    contamPct from the save-out kilosort4/ folder, derives KSLabel from the raw KS4
+    output, and applies is_good_unit. Run run_quality_metrics and save_template_metrics
+    first.
     """
     ks_data_dir, ks_out_dir = _resolve_paths(monkey, date)
     presence_ratios = np.load(ks_out_dir / 'presence_ratios.npy')
     amplitude_cutoffs = np.load(ks_out_dir / 'amplitude_cutoffs.npy')
     viol_rates = np.load(ks_out_dir / 'viol_rates.npy')
+    fr = np.load(ks_out_dir / 'fr.npy')
+    contam_pct = np.load(ks_out_dir / 'contamPct.npy')
     n_templates = len(viol_rates)
-    fr = _load_fr(ks_data_dir, n_templates)
-    contam_pct = _load_contam_pct(ks_data_dir, n_templates)
     KSLabel = _load_kslabel(ks_data_dir, n_templates)
     return is_good_unit(viol_rates, fr, presence_ratios, contam_pct,
                         amplitude_cutoffs=amplitude_cutoffs, KSLabel=KSLabel,
