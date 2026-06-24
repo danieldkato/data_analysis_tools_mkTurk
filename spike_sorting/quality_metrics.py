@@ -252,6 +252,97 @@ def run_quality_metrics(monkey: str, date: str, overwrite: bool = False) -> None
     logger.info(f"wrote presence_ratios / amplitude_cutoffs / viol_rates to {ks_out_dir}")
 
 
+def save_template_metrics(monkey: str, date: str, overwrite: bool = False) -> None:
+    """Save the Kilosort.ipynb post-processing template metrics for a session.
+
+    These arrays are part of the standard Phy/KS post-processing output but are not
+    emitted by Kilosort4 itself; quality_metrics derives them on the fly (via
+    _load_fr / _load_contam_pct / unwhitened templates). This persists them as .npy
+    into the save-out kilosort4/ folder so downstream code can read them directly
+    instead of re-deriving. All are indexed by template id (aligned to KSLabel).
+
+        - fr.npy              : per-template firing rate (Hz)
+        - contamPct.npy       : Kilosort ContamPct (NaN where absent)
+        - temp_chan_amps.npy  : (n_templates, n_chan) peak-to-trough of the unwhitened
+                                template on each channel
+        - template_depths.npy : amplitude-weighted depth (um) along the probe (ycoords)
+        - template_xcoords.npy : amplitude-weighted x-position (um) across the probe
+        - template_wf.npy     : (n_templates, n_time) scaled best-channel waveform
+        - template_amp.npy    : best-channel peak-to-trough * mean template scale factor
+        - template_dur.npy    : trough-to-peak duration of the best-channel waveform (s)
+        - template_ptratio.npy : peak/trough amplitude ratio of the best-channel waveform
+        - vertical_spread.npy : vertical extent (um) where channel amp > 15% of the peak
+
+    Run after run_kilosort has produced the kilosort4/ output for the session.
+    """
+    ks_data_dir, ks_out_dir = _resolve_paths(monkey, date)
+    if not ks_data_dir.exists():
+        raise FileNotFoundError(f"no raw kilosort4 output at {ks_data_dir}; run run_kilosort first")
+
+    targets = ['fr.npy', 'contamPct.npy', 'temp_chan_amps.npy', 'template_depths.npy',
+               'template_xcoords.npy', 'template_wf.npy', 'template_amp.npy',
+               'template_dur.npy', 'template_ptratio.npy', 'vertical_spread.npy']
+    if not overwrite and all((ks_out_dir / t).exists() for t in targets):
+        logger.info(f"template metrics already present in {ks_out_dir}, skipping (overwrite=False)")
+        return
+
+    templates = np.load(ks_data_dir / 'templates.npy')         # (n_templates, n_time, n_chan)
+    wmi = np.load(ks_data_dir / 'whitening_mat_inv.npy')
+    chan_pos = np.load(ks_data_dir / 'channel_positions.npy')
+    xcoords, ycoords = chan_pos[:, 0], chan_pos[:, 1]
+    spike_clusters = np.squeeze(np.load(ks_data_dir / 'spike_clusters.npy'))
+    amp_scale = np.squeeze(np.load(ks_data_dir / 'amplitudes.npy'))  # per-spike template scaling
+    n_templates, n_time, n_chan = templates.shape
+
+    fr = _load_fr(ks_data_dir, n_templates)
+    contam_pct = _load_contam_pct(ks_data_dir, n_templates)
+
+    # Unwhitened template peak-to-trough per channel; best channel and weighted position.
+    template_uw = np.stack([_unwhiten(np.squeeze(t), wmi) for t in templates])
+    temp_chan_amps = template_uw.max(axis=1) - template_uw.min(axis=1)  # (n_templates, n_chan)
+    temp_amps_unscaled = temp_chan_amps.max(axis=1)             # max over channels
+    best_channel = np.argmax(temp_chan_amps, axis=1)
+    template_depths = (temp_chan_amps * ycoords).sum(axis=1) / temp_chan_amps.sum(axis=1)
+    template_xcoords = (temp_chan_amps * xcoords).sum(axis=1) / temp_chan_amps.sum(axis=1)
+
+    # Per-template scale = mean of the per-spike amplitude scaling that used that template.
+    counts = np.bincount(spike_clusters, minlength=n_templates)
+    sums = np.bincount(spike_clusters, weights=amp_scale, minlength=n_templates)
+    template_scale_factor = np.divide(sums, counts, out=np.full(n_templates, np.nan),
+                                      where=counts > 0)
+    template_scaled = template_uw * template_scale_factor[:, None, None]
+
+    # Best-channel scaled waveform and its shape metrics.
+    template_wf = template_scaled[np.arange(n_templates), :, best_channel]  # (n_templates, n_time)
+    template_amp = temp_amps_unscaled * template_scale_factor
+    trough_t = np.argmin(template_wf, axis=1)
+    peak_t = np.argmax(template_wf, axis=1)
+    template_dur = (peak_t - trough_t) / SAMP_RATE
+    template_ptratio = np.max(template_wf, axis=1) / np.min(template_wf, axis=1)
+
+    # Vertical spread: distance to the furthest channel still above 15% of the best
+    # channel's peak-to-trough amplitude.
+    vertical_spread = np.full(n_templates, np.nan)
+    for n, (ch, t_amp) in enumerate(zip(best_channel, temp_chan_amps)):
+        spread_ind = np.where(t_amp[ch] * 0.15 > t_amp)[0]
+        if len(spread_ind):
+            furthest = spread_ind[np.argsort(t_amp[spread_ind])[::-1][0]]
+            vertical_spread[n] = np.abs(ycoords[ch] - ycoords[furthest])
+
+    ks_out_dir.mkdir(parents=True, exist_ok=True)
+    np.save(ks_out_dir / 'fr.npy', fr)
+    np.save(ks_out_dir / 'contamPct.npy', contam_pct)
+    np.save(ks_out_dir / 'temp_chan_amps.npy', temp_chan_amps)
+    np.save(ks_out_dir / 'template_depths.npy', template_depths)
+    np.save(ks_out_dir / 'template_xcoords.npy', template_xcoords)
+    np.save(ks_out_dir / 'template_wf.npy', template_wf)
+    np.save(ks_out_dir / 'template_amp.npy', template_amp)
+    np.save(ks_out_dir / 'template_dur.npy', template_dur)
+    np.save(ks_out_dir / 'template_ptratio.npy', template_ptratio)
+    np.save(ks_out_dir / 'vertical_spread.npy', vertical_spread)
+    logger.info(f"wrote {len(targets)} template metrics to {ks_out_dir}")
+
+
 def _load_fr(ks_data_dir: Path, n_templates: int) -> np.ndarray:
     """Per-template firing rate (Hz): spike count / recording duration."""
     spike_times = np.squeeze(np.load(ks_data_dir / 'spike_times.npy'))
@@ -311,3 +402,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     run_quality_metrics(args.monkey, args.date, overwrite=args.overwrite)
+    save_template_metrics(args.monkey, args.date, overwrite=args.overwrite)

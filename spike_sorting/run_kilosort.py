@@ -51,7 +51,7 @@ from .staging import (
     cleanup_staging,
     STAGE_LOCAL,
 )
-from .quality_metrics import run_quality_metrics
+from .quality_metrics import run_quality_metrics, save_template_metrics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -417,10 +417,13 @@ def run_kilosort(monkey: str, date: str, dredge: bool = True, override: bool = F
         logger.info(f"Session successfully completed: {monkey} {date}")
         # Export per-unit spike times + KSLabel for analyze_bystim(source='kilosort').
         # Done after staging cleanup, only on a complete sort.
-        export_spike_times_per_unit(monkey, date, override=override)
+        export_spike_times_per_unit(monkey, date, overwrite=override)
         # Save unit quality metrics (presence_ratios / amplitude_cutoffs / viol_rates)
         # for good-single-unit selection (see quality_metrics.is_good_unit).
         run_quality_metrics(monkey, date, overwrite=override)
+        # Persist fr / contamPct / template_depths / temp_chan_amps (standard Phy/KS
+        # post-processing arrays KS4 doesn't emit) into the save-out kilosort4/ folder.
+        save_template_metrics(monkey, date, overwrite=override)
     else:
         logger.warning(f"Session completed but some output files are missing: {monkey} {date}")
 
