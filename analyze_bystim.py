@@ -247,3 +247,36 @@ def kilosort_psth_complete(monkey: str, date: str) -> bool:
     n_done = len(list(ks_out.glob('clu*_psth_stim')))
     print(f"existing kilosort PSTHs: {n_done}/{n_units} units")
     return n_units > 0 and n_done >= n_units
+
+
+def main():
+    """CLI entry point so the by_stim step can be run as a package module:
+
+        cd <dir containing data_analysis_tools_mkTurk/>
+        python -m data_analysis_tools_mkTurk.analyze_bystim \
+            --monkey Bourgeois --date 20241206 --source kilosort
+
+    For source='kilosort' it skips the run when kilosort_psth_complete() is already
+    True (so requeues are cheap); pass --force to recompute anyway.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run analyze_bystim for one session.')
+    parser.add_argument('--monkey', required=True)
+    parser.add_argument('--date', required=True)
+    parser.add_argument('--source', default='mua', choices=['mua', 'kilosort'])
+    parser.add_argument('--n-jobs', type=int, default=-1,
+                        help='parallel workers (-1 = all cores)')
+    parser.add_argument('--force', action='store_true',
+                        help='recompute even if kilosort by_stim output is already complete')
+    args = parser.parse_args()
+
+    if args.source == 'kilosort' and not args.force and kilosort_psth_complete(args.monkey, args.date):
+        print('by_stim already complete; skipping (use --force to recompute)')
+        return
+
+    analyze_bystim_all(args.monkey, args.date, source=args.source, n_jobs=args.n_jobs)
+
+
+if __name__ == '__main__':
+    main()
