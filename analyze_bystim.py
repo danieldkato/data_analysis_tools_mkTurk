@@ -228,3 +228,22 @@ def analyze_bystim_all(monkey: str, date: str, channel_list=None, source: str = 
     return Parallel(n_jobs=n_jobs, verbose=10)(
         delayed(analyze_bystim)(int(n_chan), monkey, date, source) for n_chan in channel_list
     )
+
+
+def kilosort_psth_complete(monkey: str, date: str) -> bool:
+    """True if per-stim PSTHs for ALL sorted units are already written.
+
+    analyze_bystim_all(source='kilosort') derives the unit count from
+    <save_out>/kilosort4/KSLabel.npy and writes one clu{nnn}_psth_stim per unit, so the
+    output is complete when that many psth pickles exist. Returns False (recompute) if
+    KSLabel is missing — the per-unit export must run first.
+    """
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    ks_out = Path(save_out_path_list[0]) / 'kilosort4'
+    kslabel = ks_out / 'KSLabel.npy'
+    if not kslabel.exists():
+        return False
+    n_units = len(np.load(kslabel, allow_pickle=True))
+    n_done = len(list(ks_out.glob('clu*_psth_stim')))
+    print(f"existing kilosort PSTHs: {n_done}/{n_units} units")
+    return n_units > 0 and n_done >= n_units
