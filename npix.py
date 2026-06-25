@@ -1427,8 +1427,14 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     for r, row in df.iterrows():
         
         # Initialize dataframe for current session:
-        curr_df = pd.DataFrame()
+        curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
 
+        # Assign cluster labels:
+        curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(',')    
+        curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+
+        """
+        # For version of sheet deprecated as of 2026-06-25:
         # Get cluster IDs for current session:
         cluster_ids_str = row.cluster_id
         cluster_ids_cropped = cluster_ids_str[1:-1]
@@ -1454,6 +1460,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             print('curr_inds_cropped = {}'.format(curr_inds_cropped))
             curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
             curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
+        """
 
         # Get session metadata:
         monkey = re.search('[a-zA-Z]{1,}', row.session).group()
