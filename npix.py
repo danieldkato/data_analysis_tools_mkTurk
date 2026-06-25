@@ -1416,7 +1416,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     # Read CSV:
     df = pd.read_csv(csv_path)
 
-    cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id'])))
+    cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
     cluster_label_cols = [c for c in cluster_label_cols if 'filtered' not in c]
     cluster_labels = [x[:-4] for x in cluster_label_cols]
     if filtered:
@@ -1442,12 +1442,16 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             curr_cluster_label = cluster_labels[c]
             
             curr_inds_str = row[col]
-            curr_inds_cropped = curr_inds_str[1:-1]
 
-            # If no channels of current cluster, move to next cluster: 
-            if curr_inds_cropped == '':
+            # If no channels of current cluster, move to next cluster:
+            isempty = curr_inds_str is None or\
+                (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
+                (type(curr_inds_str) and curr_inds_str[1:-1]=='')
+            if isempty:
                 continue
             
+            curr_inds_cropped = curr_inds_str[1:-1]
+            print('curr_inds_cropped = {}'.format(curr_inds_cropped))
             curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
             curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
 
