@@ -1416,9 +1416,9 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     # Read CSV:
     df = pd.read_csv(csv_path)
 
-    cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
-    cluster_label_cols = [c for c in cluster_label_cols if 'filtered' not in c]
-    cluster_labels = [x[:-4] for x in cluster_label_cols]
+    coarse_cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
+    coarse_cluster_label_cols = [c for c in coarse_cluster_label_cols if 'filtered' not in c and 'cluster' not in c]
+    coarse_cluster_labels = [x[:-4] for x in coarse_cluster_label_cols]
     if filtered:
         cluster_label_cols = [x + '_filtered' for x in cluster_label_cols]
 
@@ -1426,42 +1426,43 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     dfs = []
     for r, row in df.iterrows():
         
+        # Initialize dataframe for current session:
+        curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
+
         if grain == 'fine':
-            # Initialize dataframe for current session:
-            curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
 
             # Assign cluster labels:
             curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')    
             curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+        
+        elif grain == 'coarse':
 
-        """
-        # For version of sheet deprecated as of 2026-06-25:
-        # Get cluster IDs for current session:
-        cluster_ids_str = row.cluster_id
-        cluster_ids_cropped = cluster_ids_str[1:-1]
-        cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
-        curr_df['cluster_id'] = cluster_ids
-        curr_df['ch_idx_glx'] = np.arange(curr_df.shape[0])
+            # For version of sheet deprecated as of 2026-06-25:
+            # Get cluster IDs for current session:
+            cluster_ids_str = row.cluster_id
+            cluster_ids_cropped = cluster_ids_str[1:-1]
+            cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
+            curr_df['cluster_id'] = cluster_ids
+            curr_df['ch_idx_glx'] = np.arange(curr_df.shape[0])
 
-        # Try to assign cluster labels:
-        curr_df['cluster_label'] = None
-        for c, col in enumerate(cluster_label_cols):
-            curr_cluster_label = cluster_labels[c]
-            
-            curr_inds_str = row[col]
+            # Try to assign cluster labels:
+            curr_df['cluster_label'] = None
+            for c, col in enumerate(coarse_cluster_label_cols):
+                curr_cluster_label = coarse_cluster_labels[c]
+                
+                curr_inds_str = row[col]
 
-            # If no channels of current cluster, move to next cluster:
-            isempty = curr_inds_str is None or\
-                (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
-                (type(curr_inds_str) and curr_inds_str[1:-1]=='')
-            if isempty:
-                continue
-            
-            curr_inds_cropped = curr_inds_str[1:-1]
-            print('curr_inds_cropped = {}'.format(curr_inds_cropped))
-            curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
-            curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
-        """
+                # If no channels of current cluster, move to next cluster:
+                isempty = curr_inds_str is None or\
+                    (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
+                    (type(curr_inds_str) and curr_inds_str[1:-1]=='')
+                if isempty:
+                    continue
+                
+                curr_inds_cropped = curr_inds_str[1:-1]
+                print('curr_inds_cropped = {}'.format(curr_inds_cropped))
+                curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
+                curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
 
         # Get session metadata:
         monkey = re.search('[a-zA-Z]{1,}', row.session).group()
