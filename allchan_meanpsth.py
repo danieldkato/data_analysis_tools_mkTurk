@@ -5,10 +5,10 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-from utils_meta import init_dirs
+from .utils_meta import init_dirs
 import matplotlib.pyplot as plt 
 import math
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def allchan_meanpsth(monkey: str, date: str):
     """

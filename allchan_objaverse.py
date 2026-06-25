@@ -5,11 +5,11 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-from utils_ephys import get_FSI_allchans, get_FSI_heatmap
-from utils_meta import init_dirs, get_chanmap, get_coords_sess
+from .utils_ephys import get_FSI_allchans, get_FSI_heatmap
+from .utils_meta import init_dirs, get_chanmap, get_coords_sess
 import matplotlib.pyplot as plt 
 import math
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def allchan_objaverse(monkey: str, date: str):
     """

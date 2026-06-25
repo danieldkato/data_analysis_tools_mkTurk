@@ -4,9 +4,9 @@ from pathlib import Path
 import os
 import sys
 import numpy as np
-from utils_ephys import get_psth_byscenefile_allchans, gen_heatmap_byscenefile
-from utils_meta import init_dirs, get_chanmap
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .utils_ephys import get_psth_byscenefile_allchans, gen_heatmap_byscenefile
+from .utils_meta import init_dirs, get_chanmap
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
 def allchan_scenefile(monkey: str, date: str):

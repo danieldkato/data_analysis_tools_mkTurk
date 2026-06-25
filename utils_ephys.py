@@ -6,9 +6,8 @@ import os
 import sys
 from natsort import os_sorted
 import matplotlib.pyplot as plt
-import matplotlib
 import seaborn as sns
-from utils_code import Config
+from .utils_code import Config
 
 
 def load_data(n_chan,MUA_dir):
