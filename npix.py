@@ -1427,7 +1427,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     for r, row in df.iterrows():
         
         # Initialize dataframe for current session:
-        curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
+        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
 
         if grain == 'fine':
 
@@ -1443,7 +1443,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             cluster_ids_cropped = cluster_ids_str[1:-1]
             cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
             curr_df['cluster_id'] = cluster_ids
-            curr_df['ch_idx_glx'] = np.arange(curr_df.shape[0])
+            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None
