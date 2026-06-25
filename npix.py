@@ -1430,7 +1430,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
         curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
 
         # Assign cluster labels:
-        curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(',')    
+        curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')    
         curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
 
         """
