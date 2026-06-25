@@ -93,6 +93,12 @@ def amplitude_cutoff(amplitudes, num_histogram_bins=500, histogram_smoothing_val
     Assumes a symmetric amplitude histogram (not valid under drift).
     """
     amplitudes = amplitudes[~np.isnan(amplitudes)]
+    # np.histogram can't subdivide a zero-width (or empty/non-finite) range into
+    # num_histogram_bins finite bins -> ValueError. Such a cluster has no amplitude
+    # spread, so no spikes are cut off: report 0.
+    if amplitudes.size == 0 or not np.isfinite(amplitudes).all() \
+            or np.ptp(amplitudes) == 0:
+        return 0.0
     h, b = np.histogram(amplitudes, num_histogram_bins, density=True)
     pdf = gaussian_filter1d(h, histogram_smoothing_value)
     support = b[:-1]
