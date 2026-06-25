@@ -1408,7 +1408,7 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 
 
 
-def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), filtered=False):
+def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
     """
@@ -1426,12 +1426,13 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     dfs = []
     for r, row in df.iterrows():
         
-        # Initialize dataframe for current session:
-        curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
+        if grain == 'fine':
+            # Initialize dataframe for current session:
+            curr_df = pd.DataFrame({'ch_idx_glx':np.arange(384)})
 
-        # Assign cluster labels:
-        curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')    
-        curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+            # Assign cluster labels:
+            curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')    
+            curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
 
         """
         # For version of sheet deprecated as of 2026-06-25:
