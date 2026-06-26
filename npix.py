@@ -269,7 +269,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         curr_coords_df['date'] = zero_coords.date
         chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
     
-    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
@@ -339,17 +339,18 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'], index=Chs)
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
+    coords_df['bank'] = Banks
     coords_df['ap'] = Coords[:,0]
     coords_df['ml'] = Coords[:,1]
-    coords_df['dv'] = Coords[:,2]    
+    coords_df['dv'] = Coords[:,2]
     coords_df['depth'] = depth_adjusted - D
-    
+
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
-    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
@@ -1144,10 +1145,13 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
         wkbkb_df['areas'] = areas_hat_b
         
-        # Merge area labels:
+        # Merge area labels (coerce any non-list / NaN entries to lists first so
+        # the per-row concatenation below doesn't choke on floats):
+        chs_df["areas_x"] = chs_df["areas_x"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
+        chs_df["areas_y"] = chs_df["areas_y"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
         A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
         chs_df['areas'] = A
-        chs_df = chs_df.drop(columns=['areas_x', 'areas_y']) 
+        chs_df = chs_df.drop(columns=['areas_x', 'areas_y'])
         
     # If exactly one of the dataframes returned from 'labeled brain areas' or
     # 'recording coordinate data' includes more than zero rows, just return 
@@ -1402,3 +1406,85 @@ def split_ap_dv_coords(s, idx, delimiter=','):
     except:
         part = None
     return part
+
+
+
+def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
+    """
+    Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
+    """
+
+    # Read CSV:
+    df = pd.read_csv(csv_path)
+
+    coarse_cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
+    coarse_cluster_label_cols = [c for c in coarse_cluster_label_cols if 'filtered' not in c and 'cluster' not in c]
+    coarse_cluster_labels = [x[:-4] for x in coarse_cluster_label_cols]
+    if filtered:
+        cluster_label_cols = [x + '_filtered' for x in cluster_label_cols]
+
+    # Iterate over sessions:
+    dfs = []
+    for r, row in df.iterrows():
+
+        # Initialize dataframe for current session:
+        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
+
+        if grain == 'fine':
+
+            # Assign cluster labels:
+            curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')
+            curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+
+        elif grain == 'coarse':
+
+            # For version of sheet deprecated as of 2026-06-25:
+            # Get cluster IDs for current session:
+            cluster_ids_str = row.cluster_id
+            cluster_ids_cropped = cluster_ids_str[1:-1]
+            cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
+            curr_df['cluster_id'] = cluster_ids
+            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
+
+            # Try to assign cluster labels:
+            curr_df['cluster_label'] = None
+            for c, col in enumerate(coarse_cluster_label_cols):
+                curr_cluster_label = coarse_cluster_labels[c]
+
+                curr_inds_str = row[col]
+
+                # If no channels of current cluster, move to next cluster:
+                isempty = curr_inds_str is None or\
+                    (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
+                    (type(curr_inds_str) and curr_inds_str[1:-1]=='')
+                if isempty:
+                    continue
+
+                curr_inds_cropped = curr_inds_str[1:-1]
+                print('curr_inds_cropped = {}'.format(curr_inds_cropped))
+                curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
+                curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
+
+        # Get session metadata:
+        monkey = re.search(r'[a-zA-Z]{1,}', row.session).group()
+        date = re.search(r'\d{8}', row.session).group()
+        curr_df['monkey'] = monkey
+        curr_df['date'] = date
+        dfs.append(curr_df)
+
+    # Concatenate cluster labels across sessions:
+    df_out = pd.concat(dfs, axis=0)
+
+    # Try to retrieve some metadata for latest version of CSV file:
+    csv_meta = dict()
+
+    mtime = os.path.getmtime(csv_path)
+    mtime_datetime = datetime.datetime.fromtimestamp(mtime)
+    date_str = mtime_datetime.strftime('%Y%m%d')
+    time_str = mtime_datetime.strftime('%H:%M:%S')
+
+    csv_meta['path'] = csv_path
+    csv_meta['date'] = date_str
+    csv_meta['time'] = time_str
+
+    return df_out, csv_meta
