@@ -306,7 +306,7 @@ def run_kilosort(monkey: str, date: str, dredge: bool = True, override: bool = F
         stage_mode = STAGE_NONE
         logger.info("--no-stage: forcing STAGE_NONE (read raw .bin in place, no prep/DREDge)")
     else:
-        stage_mode = choose_stage_mode(on_engram)
+        stage_mode = choose_stage_mode()
     staged = stage_mode != STAGE_NONE
 
     # From here on a claimed /local slot (or any staged dir) must be released, so

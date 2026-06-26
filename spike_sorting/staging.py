@@ -9,10 +9,10 @@ Strategy:
   * The raw *ap.bin is the same file whether it lives on engram (the locker) or a
     mounted NAS. Engram is checked first; on a miss the session subpath is mapped
     onto each NAS mount and one copy is picked at random (load balancing).
-  * Every session is staged + preprocessed. choose_stage_mode picks the destination:
-      - raw .bin on engram             -> engram (float32)
-      - raw .bin NAS-only, /local free -> /local (float16)  [claims the slot]
-      - raw .bin NAS-only, /local busy -> engram (float32)
+  * Every session is staged + preprocessed. The staging destination is independent
+    of where the raw .bin lives; choose_stage_mode just races for fast scratch:
+      - /local free -> /local (float16)  [claims the slot]
+      - /local busy -> engram (float32)
   * /local holds at most ONE staged recording at a time. The fixed LOCAL_STAGING_DIR
     is the lock: a task claims it with mkdir(exist_ok=False); a stale orphan (no
     writes within LOCAL_STALE_S) is reclaimed.
@@ -242,23 +242,22 @@ def claim_local_staging() -> bool:
         return False
 
 
-def choose_stage_mode(on_engram: bool) -> str:
+def choose_stage_mode() -> str:
     """Decide where to stage the preprocessed copy for this session.
 
-      * raw .bin on engram             -> STAGE_ENGRAM (float32)
-      * raw .bin NAS-only, /local free -> STAGE_LOCAL (float16)  [claims the slot]
-      * raw .bin NAS-only, /local busy -> STAGE_ENGRAM (float32)
+    Staging destination is independent of where the raw .bin lives: every session
+    competes for the node's single fast-scratch slot first, regardless of source.
+
+      * /local free -> STAGE_LOCAL (float16)  [claims the slot]
+      * /local busy -> STAGE_ENGRAM (float32)
 
     STAGE_LOCAL is returned only when this task atomically claims the single /local
     slot, so the slot is already held on return.
     """
-    if on_engram:
-        logger.info("stage decision: raw .bin on engram -> stage to engram (float32)")
-        return STAGE_ENGRAM
     if claim_local_staging():
-        logger.info("stage decision: NAS-only, claimed /local -> stage to /local (float16)")
+        logger.info("stage decision: claimed /local -> stage to /local (float16)")
         return STAGE_LOCAL
-    logger.info("stage decision: NAS-only, /local busy -> stage to engram (float32)")
+    logger.info("stage decision: /local busy -> stage to engram (float32)")
     return STAGE_ENGRAM
 
 

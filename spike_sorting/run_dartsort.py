@@ -242,11 +242,10 @@ def run_dartsort(monkey: str, date: str, override: bool = False, keep_stage: boo
     """Run full dartsort pipeline: preprocess, subtract, save, register, and plot.
 
     Staging mirrors run_kilosort: every session is preprocessed and staged to fast
-    disk, with the destination chosen per session by choose_stage_mode (raw .bin on
-    engram -> engram float32; NAS-only with a free /local slot -> /local float16;
-    NAS-only with /local busy -> engram float32). A session-named staged copy is
-    reused if a complete one already exists. The staged copy is removed after the
-    run unless keep_stage=True.
+    disk. The destination is independent of where the raw .bin lives — choose_stage_mode
+    claims the node's single /local slot (float16) when free, else falls back to engram
+    float32. A session-named staged copy is reused if a complete one already exists.
+    The staged copy is removed after the run unless keep_stage=True.
     """
     logger.info(f"Starting dartsort pipeline for {monkey} {date} (keep_stage={keep_stage})")
 
@@ -260,10 +259,10 @@ def run_dartsort(monkey: str, date: str, override: bool = False, keep_stage: boo
 
     session = engram_rec_dir.name
 
-    # Locate the raw .bin (engram vs NAS) and pick the staging destination before
-    # committing to a NAS copy — the decision only needs engram-vs-NAS.
+    # Locate the raw .bin (engram vs NAS). on_engram only governs which source we
+    # read from below; the staging destination is decided independently.
     on_engram, nas_copies = locate_bin(engram_rec_dir, monkey)
-    stage_mode = choose_stage_mode(on_engram)  # may CLAIM the /local slot
+    stage_mode = choose_stage_mode()  # may CLAIM the /local slot
     logger.info(f"bin_on_engram={on_engram}, nas_copies={len(nas_copies)}, stage_mode={stage_mode}")
 
     # A claimed /local slot (or any staged dir) must be released, so everything
