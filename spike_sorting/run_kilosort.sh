@@ -235,5 +235,17 @@ if (( RC == 0 )); then
   echo "--- [task $IDX] $SESS by_stim exit code: $BYSTIM_RC ($(date '+%F %T')) ---"
 fi
 
+# Only on a clean by_stim: combine the per-unit PSTHs (plus quality / template
+# metrics already written by run_kilosort) into the single-unit session HDF5 via
+# process_ks_data. It is idempotent — by_stim and metrics skip when already
+# complete, so this effectively just runs the IO/H5 step here. A failure is logged
+# but does NOT change the job's exit status. (Still cd'd to $PKG_PARENT.)
+if (( RC == 0 && BYSTIM_RC == 0 )); then
+  echo "--- Building single-unit HDF5 (process_ks_data) for $monkey $date ---"
+  $PYTHON -u -m data_analysis_tools_mkTurk.spike_sorting.process_ks_data --monkey "$monkey" --date "$date"
+  H5_RC=$?
+  echo "--- [task $IDX] $SESS process_ks_data exit code: $H5_RC ($(date '+%F %T')) ---"
+fi
+
 echo "--- [task $IDX] $SESS done ($(date '+%F %T')) ---"
 exit $RC
