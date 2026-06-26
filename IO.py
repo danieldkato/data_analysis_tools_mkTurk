@@ -14,9 +14,10 @@ import numpy as np
 import pandas as pd
 import json
 from itertools import product
-from .utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
+from .utils_meta import find_channels, find_units, get_recording_path, get_coords_sess, get_all_metadata_sess
 from .stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
 from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords
+from .spike_sorting.quality_metrics import build_unit_info_dfs
 from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
@@ -25,31 +26,42 @@ except ImportError:
 
 
 
-def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None, 
-    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None):
+def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
+    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None,
+    source='mua'):
     """
-    Combine pickled dicts of single-channel PSTHs into single HDF5. 
+    Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
 
     Parameters
     ----------
     base_data_path : str
-        Path to directory where raw data files are saved. One level above 
+        Path to directory where raw data files are saved. One level above
         monkey-level directories.
-    
+
     monkey : str
         Monkey name.
-    
+
     date : str
         Session date, formatted <yyyymmdd>.
-    
-    preprocessed_data_path : str 
-        Path to where preprocessed data files (e.g. 'ch<iii>_psth_stim') are saved. 
-        Must contain file named 'data_dict_<sess>', where <sess> is the name of 
+
+    preprocessed_data_path : str
+        Path to where preprocessed data files (e.g. 'ch<iii>_psth_stim') are saved.
+        Must contain file named 'data_dict_<sess>', where <sess> is the name of
         the directory immediately containing the raw data for the session. .
-    
+
     channels : array-like, optional
-        Array of channels indices to include data from. The default is None.
-    
+        Array of entity indices to include data from. When source='mua' these are
+        SpikeGLX channel indices; when source='ks' these are Kilosort cluster ids.
+        If None, the entities are discovered from the per-entity PSTH files in the
+        appropriate directory. The default is None.
+
+    source : 'mua' | 'ks', optional
+        Which preprocessed PSTHs to combine. 'mua' uses per-channel files named
+        'ch<nnn>_psth_stim' in preprocessed_data_path (fixed channel count;
+        original behavior). 'ks' uses per-unit files named 'clu<nnn>_psth_stim'
+        in <preprocessed_data_path>/kilosort4 (variable number of sorted units on
+        axis-0 of the data slab). The default is 'mua'.
+
     chunk_size : int, optional
         Number of trials to include in a singl HDF5 chunk. Can have up to 2-3x
         impact on read/write speeds. The default is 100.
@@ -234,25 +246,64 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         imro_tbl = pd.DataFrame()
         warnings.warn('No .ap.meta file discovered for {} session {}.'.format(monkey, date))
         
+    # Resolve which directory and per-entity filename prefix to read PSTHs from.
+    # source='mua' reads per-channel files ('ch<nnn>_psth_stim') directly from
+    # preprocessed_data_path; source='ks' reads per-unit files ('clu<nnn>_psth_stim')
+    # from the kilosort4 subdir, where the number of entities (sorted units) varies
+    # by session rather than being a fixed channel count.
+    match source:
+        case 'mua':
+            psth_dir = preprocessed_data_path
+            entity_prefix = 'ch'
+        case 'ks':
+            psth_dir = os.path.join(preprocessed_data_path, 'kilosort4')
+            entity_prefix = 'clu'
+        case _:
+            raise ValueError("source must be 'mua' or 'ks', got {}".format(source))
+
     # Initialize data array:
     if channels is None:
-        channels = find_channels(preprocessed_data_path)
+        if source == 'mua':
+            channels = find_channels(preprocessed_data_path)
+        else:
+            channels = find_units(psth_dir)
+
+    # For single units, assemble the per-unit metrics tables (one row per unit,
+    # raw metrics only) and align them to the unit order on axis-0 of the slab so
+    # good-unit filtering and spatial lookups can be applied later from the H5
+    # alone. Two tables by purpose: unit_quality (is_good_unit inputs + KSLabel)
+    # and unit_spatial (probe location + amplitude). Missing metric files are
+    # tolerated (filled with NaN) inside build_unit_info_dfs.
+    unit_quality_df = None
+    unit_spatial_df = None
+    if source == 'ks':
+        try:
+            unit_quality_df, unit_spatial_df = build_unit_info_dfs(psth_dir)
+            # Reindex to axis-0 unit order ('unit_id' index -> column):
+            unit_quality_df = unit_quality_df.reindex(np.asarray(channels)).reset_index()
+            unit_spatial_df = unit_spatial_df.reindex(np.asarray(channels)).reset_index()
+        except Exception as e:
+            unit_quality_df = pd.DataFrame()
+            unit_spatial_df = pd.DataFrame()
+            warnings.warn('Failed to build unit metrics tables for {} {}: {}'.format(monkey, date, e))
+
     n_bins = len(psth_bins) - 1
     n_trials = np.max(trial_params_df['trial_num']) + 1
     n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
     
-    # Iterate over channels:
+    # Iterate over entities (channels for source='mua', sorted units for source='ks'):
+    entity_label = 'unit' if source == 'ks' else 'channel'
     input_files = []
     for cx, channel in enumerate(channels):
-        
-        print('Loading data for channel {} of {}...'.format(cx+1, len(channels)))
-        
-        # Load data for current channel:
-        stim_fname = 'ch{}'.format(str(channel).zfill(3)) + '_psth_stim'
-        fullpath = os.path.join(preprocessed_data_path, stim_fname)
-        curr_ch_dict = pickle.load(open(fullpath,'rb')) 
+
+        print('Loading data for {} {} of {}...'.format(entity_label, cx+1, len(channels)))
+
+        # Load data for current entity:
+        stim_fname = '{}{}'.format(entity_prefix, str(channel).zfill(3)) + '_psth_stim'
+        fullpath = os.path.join(psth_dir, stim_fname)
+        curr_ch_dict = pickle.load(open(fullpath,'rb'))
         input_files.append(fullpath)
             
         # Iterate over stimulus conditions:
@@ -287,9 +338,15 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         output_path = os.path.join(output_directory, fname+'.h5') 
         
         print('Saving HDF5 to disk...')
+        # NOTE: the h5py datasets/attrs and the pandas (PyTables) dataframes are
+        # written in two separate phases. Calling DataFrame.to_hdf() while the
+        # h5py handle below is still open would open the same file twice at once,
+        # which fails on network filesystems (SMB/NFS) with an HDF5 file-lock
+        # error ("unable to lock the file, errno = 11"). The h5py block therefore
+        # closes before any to_hdf() call runs.
         with h5py.File(output_path, 'w') as f:
             #dset = f.create_dataset('data', data=spike_counts, dtype='int32')
-            
+
             # Define chunk size:
             if chunk_size is True:
                 spike_chunks = True
@@ -300,34 +357,15 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             else:
                 spike_chunks = (spike_counts.shape[0], spike_counts.shape[1], chunk_size, spike_counts.shape[3])
                 stim_id_chunks = (chunk_size, stim_indices.shape[1])
-            
+
             # Create dataset containing actual spike counts:
             dset = f.create_dataset('data', data=spike_counts, dtype=dtype, rdcc_nbytes=8*(10**9)*3, chunks=spike_chunks)
             #dset.attrs['trial_df'] = trial_df
-            
+
             # Write scenefile-by-stim_id boolean matrix specifying which stim
             # came from which scenefiles:
             scenefile_lookup = f.create_dataset('stim_indices', data=stim_indices, dtype=dtype, chunks=stim_id_chunks)
-            
-            # Write full dataframe of trial parameters:
-            trial_params_df_out = trial_params_df.copy()
-            trial_params_df_out = standardize_col_types(trial_params_df_out)
-            trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
-            
-            #"""
-            # Write truncated dataframe of select trial parameters:
-            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
-            if 'img_full_path' in trial_params_df.columns:
-                short_cols.append('img_full_path')
-            trial_params_short = trial_params_df[short_cols] 
-            trial_params_short = trial_params_short.rename(columns={'stim_info_short' : 'stim_id'})
-            trial_params_short.to_hdf(output_path, 'trial_params_short', 'a', format='fixed')
-            #"""
-            
-            # Write channel coordinates:
-            zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
-            imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
-            
+
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
             f.attrs['binwidth'] = bin_width
@@ -338,8 +376,45 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             f.attrs['stim_ids'] = stim_ids
             f.attrs['scenefiles'] = scenefiles
             f.attrs['scenefile_by_stim_mat'] = scenefile_mat
-            
-            
+
+            # Record which entities populate axis-0 of the data slab. For source='ks'
+            # also store the cluster ids, since (unlike channels) the unit count is
+            # variable and the ids are not implied by position.
+            f.attrs['source'] = source
+            if source == 'ks':
+                f.attrs['unit_ids'] = np.asarray(channels)
+
+        # h5py handle is now closed; append the pandas dataframes (PyTables) to
+        # the same file, one open at a time.
+
+        # Write full dataframe of trial parameters:
+        trial_params_df_out = trial_params_df.copy()
+        trial_params_df_out = standardize_col_types(trial_params_df_out)
+        trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
+
+        #"""
+        # Write truncated dataframe of select trial parameters:
+        short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
+        if 'img_full_path' in trial_params_df.columns:
+            short_cols.append('img_full_path')
+        trial_params_short = trial_params_df[short_cols]
+        trial_params_short = trial_params_short.rename(columns={'stim_info_short' : 'stim_id'})
+        trial_params_short.to_hdf(output_path, 'trial_params_short', 'a', format='fixed')
+        #"""
+
+        # Write channel coordinates:
+        zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
+        imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
+
+        # For single units, write the per-unit metrics tables (each row-aligned
+        # to axis-0 of `data`): unit_quality for good-unit filtering downstream,
+        # unit_spatial for probe location / amplitude.
+        if source == 'ks':
+            if unit_quality_df is not None:
+                standardize_col_types(unit_quality_df.copy()).to_hdf(output_path, 'unit_quality', 'a', format='table')
+            if unit_spatial_df is not None:
+                standardize_col_types(unit_spatial_df.copy()).to_hdf(output_path, 'unit_spatial', 'a', format='table')
+
         if 'analysis_metadata' in sys.modules:
             M = Metadata()
             for i in input_files:

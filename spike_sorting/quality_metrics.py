@@ -17,6 +17,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from scipy.ndimage import gaussian_filter1d
 
 from ..utils_meta import init_dirs
@@ -360,7 +361,6 @@ def _load_fr(ks_data_dir: Path, n_templates: int) -> np.ndarray:
 
 def _load_contam_pct(ks_data_dir: Path, n_templates: int) -> np.ndarray:
     """Per-template Kilosort ContamPct from cluster_ContamPct.tsv (NaN where absent)."""
-    import pandas as pd
     df = pd.read_csv(ks_data_dir / 'cluster_ContamPct.tsv', sep='\t')
     contam = np.full(n_templates, np.nan)
     cid = df['cluster_id'].to_numpy()
@@ -370,7 +370,6 @@ def _load_contam_pct(ks_data_dir: Path, n_templates: int) -> np.ndarray:
 
 def _load_kslabel(ks_data_dir: Path, n_templates: int) -> np.ndarray:
     """Per-template KSLabel ('good'/'mua') from cluster_KSLabel.tsv ('' where absent)."""
-    import pandas as pd
     df = pd.read_csv(ks_data_dir / 'cluster_KSLabel.tsv', sep='\t')
     labels = np.full(n_templates, '', dtype=object)
     cid = df['cluster_id'].to_numpy()
@@ -398,6 +397,104 @@ def load_good_unit_mask(monkey: str, date: str, strict: bool = True,
     return is_good_unit(viol_rates, fr, presence_ratios, contam_pct,
                         amplitude_cutoffs=amplitude_cutoffs, KSLabel=KSLabel,
                         strict=strict, require_single_unit=require_single_unit)
+
+
+# Per-unit (1-D, one entry per template/cluster id) metric arrays written to the
+# save-out kilosort4/ folder, split into two tables by purpose and mapped to the
+# column name used in each DataFrame. 2-D arrays (temp_chan_amps, template_wf) are
+# intentionally excluded since they don't fit a flat per-unit table.
+#
+# Quality: exactly the inputs to is_good_unit (plus KSLabel, added separately),
+# so the unit_quality table alone reproduces every good-unit threshold set.
+_UNIT_QUALITY_FILES = {
+    'viol_rates': 'viol_rates.npy',
+    'fr': 'fr.npy',
+    'presence_ratios': 'presence_ratios.npy',
+    'contamPct': 'contamPct.npy',
+    'amplitude_cutoffs': 'amplitude_cutoffs.npy',
+}
+# Spatial / probe: where the unit sits on the probe and its amplitude.
+_UNIT_SPATIAL_FILES = {
+    'template_depths': 'template_depths.npy',
+    'template_xcoords': 'template_xcoords.npy',
+    'vertical_spread': 'vertical_spread.npy',
+    'template_amp': 'template_amp.npy',
+}
+
+
+def _load_metric_df(ks_out_dir: Path, metric_files: dict[str, str]) -> pd.DataFrame:
+    """DataFrame of the given per-unit metric .npy files, indexed by unit_id.
+
+    Each array is 1-D and indexed by template/cluster id. Missing files are filled
+    with NaN (with a warning); the unit count is taken from the first array found.
+    Raises if none of the requested files exist.
+    """
+    n_templates = None
+    loaded = {}
+    for col, fname in metric_files.items():
+        fpath = ks_out_dir / fname
+        if fpath.exists():
+            arr = np.load(fpath)
+            loaded[col] = arr
+            if n_templates is None:
+                n_templates = len(arr)
+        else:
+            logger.warning(f"unit metric {fname} not found in {ks_out_dir}; filling with NaN")
+
+    if n_templates is None:
+        raise FileNotFoundError(
+            f"none of {list(metric_files.values())} found in {ks_out_dir}; "
+            "run run_quality_metrics and save_template_metrics first")
+
+    df = pd.DataFrame(index=np.arange(n_templates))
+    df.index.name = 'unit_id'
+    for col in metric_files:
+        df[col] = loaded[col] if col in loaded else np.nan
+    return df
+
+
+def load_unit_info_dfs(monkey: str, date: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Assemble a session's saved per-unit metrics into two DataFrames.
+
+    Resolves the save-out kilosort4/ folder, then delegates to build_unit_info_dfs.
+    Returns (unit_quality, unit_spatial); see build_unit_info_dfs for columns.
+    """
+    _, ks_out_dir = _resolve_paths(monkey, date)
+    return build_unit_info_dfs(ks_out_dir)
+
+
+def build_unit_info_dfs(ks_out_dir: Path | str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Two per-unit DataFrames from an already-resolved kilosort4 out-dir.
+
+    `ks_out_dir` is the save-out kilosort4/ folder holding the metric .npy files
+    (run_quality_metrics / save_template_metrics) and KSLabel.npy (run_kilosort).
+    Returns (unit_quality, unit_spatial), each one row per template/cluster id
+    (index = 'unit_id'); raw metrics only, no good-unit boolean.
+
+        unit_quality : viol_rates, fr, presence_ratios, contamPct,
+                       amplitude_cutoffs, KSLabel  (the is_good_unit inputs)
+        unit_spatial : template_depths, template_xcoords, vertical_spread,
+                       template_amp
+
+    Missing metric files are filled with NaN (KSLabel with ''), so a session
+    lacking metrics still yields valid (mostly-NaN) tables.
+    """
+    ks_out_dir = Path(ks_out_dir)
+
+    unit_quality = _load_metric_df(ks_out_dir, _UNIT_QUALITY_FILES)
+
+    # KSLabel is mirrored to the save-out folder by run_kilosort (KSLabel.npy),
+    # already indexed by template id, so read it from there alongside the metrics.
+    kslabel_path = ks_out_dir / 'KSLabel.npy'
+    if kslabel_path.exists():
+        unit_quality['KSLabel'] = np.load(kslabel_path, allow_pickle=True)
+    else:
+        logger.warning(f"KSLabel.npy not found in {ks_out_dir}; filling KSLabel with ''")
+        unit_quality['KSLabel'] = ''
+
+    unit_spatial = _load_metric_df(ks_out_dir, _UNIT_SPATIAL_FILES)
+
+    return unit_quality, unit_spatial
 
 
 if __name__ == '__main__':
