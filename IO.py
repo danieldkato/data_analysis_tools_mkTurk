@@ -117,12 +117,12 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         preprocessed_data_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
     
     pen_id = preprocessed_data_path.split(os.path.sep)[-1]
-    
-    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
-    
+
     # Load metadata for current session
+    # For source='ks', fall back to the kilosort4 subdir for psth_stim_meta (ks-only sessions).
+    stim_meta_dir = os.path.join(preprocessed_data_path, 'kilosort4') if source == 'ks' else None
     recording_dir = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0].split(os.sep)[-1]
-    sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
+    sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path, stim_meta_dir=stim_meta_dir)
     sess_meta_df = sess_meta_dict_2_df(sess_meta)
     stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
     data_dict_path = os.path.join(preprocessed_data_path, 'data_dict_' + recording_dir)
@@ -844,11 +844,34 @@ def standardize_col_types(df):
         
         # If all non-NaNs are arrays:
         if np.all(df[~df[col].isna()][col].apply(lambda x : type(x)==np.ndarray)):
-            
+
             # If all arrays are singleton:
             if np.all(df[~df[col].isna()][col].apply(lambda x : len(x)==1)):
                 df[col] = df.apply(lambda x : x[col][0] if type(x[col])==np.ndarray else x[col], axis=1)
-                
+
+    # Second pass: catch object columns PyTables can't serialize with
+    # format='table' even when they are NOT multi-type. A column that is uniformly
+    # dict / list / nested (e.g. a behavior field like SampleStartTime that comes
+    # back as a dict in some files) has typenum==1 and so is missed above, but
+    # to_hdf(format='table') still raises "Cannot serialize the column". Coerce any
+    # object column holding non-scalar values: to numeric if possible (malformed
+    # entries -> NaN), otherwise to string.
+    def _is_nonscalar(x):
+        return isinstance(x, (dict, list, tuple, set, np.ndarray))
+
+    for col in df.columns:
+        if df[col].dtype != object:
+            continue
+        if df[col].apply(_is_nonscalar).any():
+            coerced = pd.to_numeric(df[col], errors='coerce')
+            # Use the numeric coercion only if it preserved the real (scalar) values;
+            # if everything became NaN the column was non-numeric, so stringify instead.
+            scalar_mask = ~df[col].apply(_is_nonscalar) & df[col].notna()
+            if scalar_mask.any() and coerced[scalar_mask].notna().all():
+                df[col] = coerced
+            else:
+                df[col] = df[col].apply(lambda x : '' if _is_nonscalar(x) else x).astype(str)
+
     return df
 
 
@@ -1293,6 +1316,42 @@ def stim_idx_2_img_path(sfile_img_dir, stim_idx):
 
 
 
+def coerce_trial_timing(value: dict | list | np.ndarray, n_trials: int) -> np.ndarray:
+    """Normalize a per-trial timing field to a flat float array of length n_trials.
+
+    Behavior files occasionally store a timing field (e.g. SampleStartTime) as a
+    dict or a short/ragged list rather than one value per trial. np.array() then
+    yields a 0-d or wrong-length array that breaks downstream arithmetic. This
+    coerces `value` to a length-n_trials float array: parses numerics
+    (errors -> NaN), and pads/truncates to n_trials, NaN-filling anything missing.
+
+    Parameters
+    ----------
+    value : dict | list | array-like
+        Raw TRIALEVENTS timing field for one behavior file.
+    n_trials : int
+        Number of trials (use a reliably per-trial field such as NReward).
+
+    Returns
+    -------
+    numpy.ndarray
+        Float array of shape (n_trials,).
+    """
+    if isinstance(value, dict):
+        vals = np.empty(0, dtype=float)
+    else:
+        arr = pd.to_numeric(pd.Series(value).squeeze(), errors='coerce')
+        vals = np.asarray(arr, dtype=float).ravel()
+
+    if vals.shape[0] == n_trials:
+        return vals
+
+    out = np.full(n_trials, np.nan)
+    out[:min(len(vals), n_trials)] = vals[:n_trials]  # keep what aligns, NaN the rest
+    return out
+
+
+
 def find_complete_rsvp_slots(bfile):
 
     # Get some scene metadata:
@@ -1309,12 +1368,19 @@ def find_complete_rsvp_slots(bfile):
     # Get single-trial data:
     trial_df = pd.DataFrame()
 
-    # Get trial timing data:
-    start_time = np.array(bfile['TRIALEVENTS']['StartTime'])
-    sample_start_time = np.array(bfile['TRIALEVENTS']['SampleStartTime'])
-    reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
-    end_time = np.array(bfile['TRIALEVENTS']['EndTime'])
+    # Get trial timing data. Some behavior files have a malformed timing field
+    # (e.g. SampleStartTime stored as a dict instead of a per-trial list), which
+    # np.array() turns into a 0-d / object array of the wrong length and breaks the
+    # arithmetic below. coerce_trial_timing() normalizes each field to a flat float
+    # array of length n_trials (reward/NReward is reliably per-trial), NaN-filling
+    # where it can't be parsed.
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
+    n_trials = len(reward)
+
+    start_time = coerce_trial_timing(bfile['TRIALEVENTS']['StartTime'], n_trials)
+    sample_start_time = coerce_trial_timing(bfile['TRIALEVENTS']['SampleStartTime'], n_trials)
+    reinforcement_time = coerce_trial_timing(bfile['TRIALEVENTS']['ReinforcementTime'], n_trials)
+    end_time = coerce_trial_timing(bfile['TRIALEVENTS']['EndTime'], n_trials)
     trial_df['start_time'] = start_time
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
