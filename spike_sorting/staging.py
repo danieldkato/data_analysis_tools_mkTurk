@@ -242,18 +242,31 @@ def claim_local_staging() -> bool:
         return False
 
 
-def choose_stage_mode() -> str:
+def choose_stage_mode(session: str | None = None) -> str:
     """Decide where to stage the preprocessed copy for this session.
 
     Staging destination is independent of where the raw .bin lives: every session
     competes for the node's single fast-scratch slot first, regardless of source.
 
+      * /local already holds THIS session's valid staged copy -> STAGE_LOCAL (reuse)
       * /local free -> STAGE_LOCAL (float16)  [claims the slot]
       * /local busy -> STAGE_ENGRAM (float32)
 
-    STAGE_LOCAL is returned only when this task atomically claims the single /local
-    slot, so the slot is already held on return.
+    The reuse case comes first: run_dartsort stages to /local with --keep-stage and
+    leaves the copy for the chained run_kilosort. Without this check the leftover
+    /local dir reads as a "busy" slot (mkdir lock fails), so kilosort would re-stage
+    to engram instead of reusing the float16 copy dartsort already wrote. When a
+    valid copy exists we return STAGE_LOCAL WITHOUT claiming (the dir is already
+    there); stage_recording's staged_copy_is_valid path then loads it.
+
+    STAGE_LOCAL is otherwise returned only when this task atomically claims the
+    single /local slot, so the slot is already held on return.
     """
+    if session is not None:
+        existing = LOCAL_STAGING_DIR / session / "rec_ppx"
+        if staged_copy_is_valid(existing):
+            logger.info(f"stage decision: reusing existing /local staged copy {existing}")
+            return STAGE_LOCAL
     if claim_local_staging():
         logger.info("stage decision: claimed /local -> stage to /local (float16)")
         return STAGE_LOCAL

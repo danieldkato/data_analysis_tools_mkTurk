@@ -262,7 +262,7 @@ def run_dartsort(monkey: str, date: str, override: bool = False, keep_stage: boo
     # Locate the raw .bin (engram vs NAS). on_engram only governs which source we
     # read from below; the staging destination is decided independently.
     on_engram, nas_copies = locate_bin(engram_rec_dir, monkey)
-    stage_mode = choose_stage_mode()  # may CLAIM the /local slot
+    stage_mode = choose_stage_mode(session=session)  # may CLAIM the /local slot
     logger.info(f"bin_on_engram={on_engram}, nas_copies={len(nas_copies)}, stage_mode={stage_mode}")
 
     # A claimed /local slot (or any staged dir) must be released, so everything
