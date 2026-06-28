@@ -29,6 +29,10 @@ mkdir -p /home/yy3658/NeuralWaveform/jobs/logs/
 if [[ -n "${MONKEY:-}" && -n "${DATE:-}" ]]; then
   monkey="$MONKEY"
   date="$DATE"
+  # Single-session mode has no array index; IDX/SESS are referenced later (NAS_ROOT,
+  # log tags) and set -u would abort on them. Give them single-session defaults.
+  IDX=0
+  SESS="${monkey}_${date}"
   echo "=== [single session] $(hostname)  $(date '+%F %T') ==="
   echo "monkey=$monkey date=$date"
 else
@@ -208,9 +212,7 @@ $PYTHON -V
 echo "GPUs visible: ${CUDA_VISIBLE_DEVICES:-unset}"
 
 # run_kilosort and analyze_bystim use intra-package relative imports, so they run via
-# -m from the dir CONTAINING data_analysis_tools_mkTurk/. This script lives in
-# <pkg>/spike_sorting/, so that parent is two dirs up (same derivation as
-# run_dartsort.sh; override NEURALWF_PKG_PARENT to relocate). cd there and `python -m`
+# -m from the dir CONTAINING data_analysis_tools_mkTurk/. cd there and `python -m`
 # directly: cwd becomes sys.path[0] and the container inherits it via the bind mounts.
 # (No --no-stage: every session is staged + preprocessed; run_kilosort just picks the
 # destination — /local float16 if free, else engram float32; see choose_stage_mode.)

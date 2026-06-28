@@ -55,12 +55,13 @@ STAGING_MANIFEST="${NEURALWF_STAGING_MANIFEST:-/tmp/dartsort_staging_${SLURM_JOB
 export NEURALWF_STAGING_MANIFEST="$STAGING_MANIFEST"
 rm -f "$STAGING_MANIFEST" 2>/dev/null || true
 DARTSORT_OK=0
-cleanup() {
-    # On a clean exit with --keep-stage we KEEP the staged copy for kilosort.
-    if (( DARTSORT_OK == 1 )); then
-        echo "dartsort succeeded; keeping staged copy for kilosort (--keep-stage)"
-        return 0
-    fi
+# Only the signal path (SIGKILL/timeout/TERM/INT) should sweep the staged copy:
+# that's the one case Python's finally can't run. A normal nonzero exit means the
+# Python finally already ran and honored --keep-stage, so the shell trap must NOT
+# delete the staged copy (doing so destroyed an hour of staging when dartsort
+# crashed recoverably). swept_by_signal is set only by the TERM/INT trap.
+swept_by_signal=0
+sweep_staged() {
     [ -f "$STAGING_MANIFEST" ] || return 0
     while IFS= read -r d; do
         case "$d" in
@@ -70,8 +71,22 @@ cleanup() {
     done < "$STAGING_MANIFEST"
     rm -f "$STAGING_MANIFEST"
 }
+cleanup() {
+    if (( DARTSORT_OK == 1 )); then
+        echo "dartsort succeeded; keeping staged copy for kilosort (--keep-stage)"
+        return 0
+    fi
+    if (( swept_by_signal == 1 )); then
+        # Killed by signal: Python finally never ran, so we must sweep.
+        sweep_staged
+    else
+        # Normal nonzero exit: Python finally already honored --keep-stage.
+        # Leave the staged copy in place so it can be reused on a rerun.
+        echo "dartsort exited nonzero (no signal); leaving staged copy in place (--keep-stage)"
+    fi
+}
 trap cleanup EXIT
-trap 'trap - EXIT; cleanup; exit 143' TERM INT
+trap 'trap - EXIT; swept_by_signal=1; cleanup; exit 143' TERM INT
 
 # --- Mount the NAS for this monkey (raw .ap.bin may live there) ---
 # Key-based auth (public key in issalab's authorized_keys on each server). Mount
@@ -137,10 +152,15 @@ export PYTHONUNBUFFERED=1
 # --- Run dartsort with --keep-stage (stage, but keep the copy for kilosort) ---
 echo "--- Running DARTsort (--keep-stage) for $monkey $date ---"
 cd "$PKG_PARENT"
-python -m data_analysis_tools_mkTurk.spike_sorting.run_dartsort \
-    --monkey "$monkey" --date "$date" --keep-stage
-DARTSORT_OK=1
-echo "DARTsort completed for $monkey $date"
+if python -m data_analysis_tools_mkTurk.spike_sorting.run_dartsort \
+    --monkey "$monkey" --date "$date" --keep-stage; then
+    DARTSORT_OK=1
+    echo "DARTsort completed for $monkey $date"
+else
+    rc=$?
+    echo "ERROR: DARTsort failed for $monkey $date (exit $rc); not chaining Kilosort"
+    exit "$rc"
+fi
 
 # --- Chain the Kilosort sbatch, only if dartsort succeeded (afterok) ---
 echo "--- Submitting Kilosort (depends on this dartsort job) ---"
