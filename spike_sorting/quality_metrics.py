@@ -38,7 +38,7 @@ VIOL_RATE_MAX = 0.5        # ISI-violation fpRate below this
 FIRING_RATE_MIN = 0.5      # Hz, above this
 PRESENCE_RATIO_MIN = 0.9   # fires in >90% of time bins
 CONTAM_PCT_MAX = 50        # Kilosort ContamPct below this
-AMP_CUTOFF_MAX = 0.5       # estimated missing-spike fraction below this (strict only)
+AMP_CUTOFF_MAX = 0.1       # estimated missing-spike fraction below this (strict only)
 # ISI-violation parameters. isi_threshold is the refractory window: any inter-spike
 # interval shorter than this counts as a violation. min_isi is the tiny floor below
 # which a second spike is treated as a duplicate and dropped.
