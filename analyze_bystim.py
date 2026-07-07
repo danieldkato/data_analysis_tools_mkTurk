@@ -4,13 +4,14 @@ from pathlib import Path
 import os
 import sys
 import numpy as np
-from .utils_ephys import get_data_bl, get_data_bystim, gen_psth_byscenefile
+from joblib import Parallel, delayed
+from .utils_ephys import get_data_bl, get_data_bystim, get_data_bystim_kilosort, gen_psth_byscenefile
 from .utils_meta import init_dirs, get_chanmap
 from .utils_code import Config 
 from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
-def analyze_bystim(n_chan: int, monkey: str, date: str):
+def analyze_bystim(n_chan: int, monkey: str, date: str, source: str = 'mua'):
     """
     Analyze neural data by stimulus for a specific channel.
     This function processes multi-unit activity (MUA) data for a single channel, organizing it by stimulus
@@ -48,6 +49,8 @@ def analyze_bystim(n_chan: int, monkey: str, date: str):
 
     for n, (data_path, save_out_path, plot_save_out_path) in enumerate(zip(data_path_list, save_out_path_list, plot_save_out_path_list)):
         MUA_dir = data_path / Path('MUA_4SD')
+        if source == 'kilosort':
+            MUA_dir = data_path / Path('kilosort4') / 'spike_times_perunit'
         data_path = Path(data_path)
         save_out_path = Path(save_out_path)
         plot_save_out_path = Path(plot_save_out_path)
@@ -93,6 +96,13 @@ def analyze_bystim(n_chan: int, monkey: str, date: str):
             os.makedirs(plot_save_out_path,exist_ok= True)
         ##############################################################################################################################################
 
+        if source == 'kilosort':
+            # kilosort: PSTH only, written under a 'kilosort4' subdir with 'clu' prefix
+            ks_out_path = save_out_path / 'kilosort4'
+            os.makedirs(ks_out_path, exist_ok=True)
+            ch_psth_stim, ch_psth_stim_meta = get_data_bystim_kilosort(n_chan, MUA_dir, stim_info_path, binwidth_psth= 0.01)
+            pickle.dump(ch_psth_stim, open(ks_out_path / 'clu{:0>3d}_psth_stim'.format(n_chan),'wb'), protocol = 2)
+            continue
 
         # get baseline
         ch_psth_bl, ch_psth_bl_meta,ch_psth_bl_stim = get_data_bl(n_chan, MUA_dir, data_dict_path,stim_info_path)
@@ -193,3 +203,80 @@ def analyze_bystim(n_chan: int, monkey: str, date: str):
             chanmap = np.load(save_out_path / 'chanmap.npy')
 
         gen_psth_byscenefile(n_chan,plot_save_out_path, psth_byscenefile, psth_byscenefile_meta,chanmap)
+
+
+def analyze_bystim_all(monkey: str, date: str, channel_list=None, source: str = 'mua', n_jobs: int = -1):
+    """
+    Run analyze_bystim across many channels (mua) or sorted units (kilosort) in parallel.
+
+    Args:
+        monkey (str): Monkey identifier.
+        date (str): Recording date string.
+        channel_list: Iterable of channel (mua) or unit (kilosort) indices to process. For
+            source='kilosort', if None the sorted units are derived from KSLabel.npy.
+        source (str): 'mua' or 'kilosort'.
+        n_jobs (int): Number of parallel workers (-1 = all cores).
+    """
+    if source == 'kilosort' and channel_list is None:
+        # process only the kilosort-sorted units (one entry per cluster in KSLabel)
+        _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+        KSLabel = np.load(Path(save_out_path_list[0]) / 'kilosort4' / 'KSLabel.npy', allow_pickle=True)
+        channel_list = np.arange(len(KSLabel))
+
+    unit_name = 'units' if source == 'kilosort' else 'channels'
+    print(f"\nProcessing {len(channel_list)} {source} {unit_name} with {n_jobs} workers...")
+    return Parallel(n_jobs=n_jobs, verbose=10)(
+        delayed(analyze_bystim)(int(n_chan), monkey, date, source) for n_chan in channel_list
+    )
+
+
+def kilosort_psth_complete(monkey: str, date: str) -> bool:
+    """True if per-stim PSTHs for ALL sorted units are already written.
+
+    analyze_bystim_all(source='kilosort') derives the unit count from
+    <save_out>/kilosort4/KSLabel.npy and writes one clu{nnn}_psth_stim per unit, so the
+    output is complete when that many psth pickles exist. Returns False (recompute) if
+    KSLabel is missing — the per-unit export must run first.
+    """
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    ks_out = Path(save_out_path_list[0]) / 'kilosort4'
+    kslabel = ks_out / 'KSLabel.npy'
+    if not kslabel.exists():
+        return False
+    n_units = len(np.load(kslabel, allow_pickle=True))
+    n_done = len(list(ks_out.glob('clu*_psth_stim')))
+    print(f"existing kilosort PSTHs: {n_done}/{n_units} units")
+    return n_units > 0 and n_done >= n_units
+
+
+def main():
+    """CLI entry point so the by_stim step can be run as a package module:
+
+        cd <dir containing data_analysis_tools_mkTurk/>
+        python -m data_analysis_tools_mkTurk.analyze_bystim \
+            --monkey Bourgeois --date 20241206 --source kilosort
+
+    For source='kilosort' it skips the run when kilosort_psth_complete() is already
+    True (so requeues are cheap); pass --force to recompute anyway.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run analyze_bystim for one session.')
+    parser.add_argument('--monkey', required=True)
+    parser.add_argument('--date', required=True)
+    parser.add_argument('--source', default='mua', choices=['mua', 'kilosort'])
+    parser.add_argument('--n-jobs', type=int, default=-1,
+                        help='parallel workers (-1 = all cores)')
+    parser.add_argument('--force', action='store_true',
+                        help='recompute even if kilosort by_stim output is already complete')
+    args = parser.parse_args()
+
+    if args.source == 'kilosort' and not args.force and kilosort_psth_complete(args.monkey, args.date):
+        print('by_stim already complete; skipping (use --force to recompute)')
+        return
+
+    analyze_bystim_all(args.monkey, args.date, source=args.source, n_jobs=args.n_jobs)
+
+
+if __name__ == '__main__':
+    main()

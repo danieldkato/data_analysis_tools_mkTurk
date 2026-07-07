@@ -421,7 +421,7 @@ def get_psth_byscenefile_allchans(save_out_path):
         
 def load_kilosort(n_chan, kilosort_dir):
 
-    st = np.load(kilosort_dir / 'good_unit'/ 'clu_{:0>3d}_st.npy'.format(n_chan))
+    st = np.load(kilosort_dir / 'clu_{:0>3d}_st.npy'.format(n_chan))
 
     return st
 

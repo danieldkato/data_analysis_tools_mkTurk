@@ -37,16 +37,20 @@ import dredge.motion_util as mu
 import matplotlib.pyplot as plt
 import torch
 import pickle
-import shutil
 
 # Suppress PyTorch tensor resize warning from dartsort library
 warnings.filterwarnings("ignore", message="An output with one or more elements was resized")
-try:
-    from .utils_meta import init_dirs
-    from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
-except ImportError:
-    from data_analysis_tools_mkTurk.utils_meta import init_dirs
-    from data_analysis_tools_mkTurk.make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from ..utils_meta import init_dirs
+from ..make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .staging import (
+    detect_compute_resources,
+    find_recording_dir,
+    locate_bin,
+    pick_nas_copy,
+    choose_stage_mode,
+    stage_recording,
+    cleanup_staging,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,50 +59,49 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-LOCAL_STAGING_ROOT = Path("/local")
-
-
 def resolve_dartsort_path(monkey: str, date: str) -> tuple[Path, Path, Path, Path]:
-    """Resolve data, save, and plot paths for a given monkey/date session."""
+    """Resolve engram recording dir, save, plot, and dartsort_output paths.
+
+    Descends into the SpikeGLX run folder (so engram_rec_dir holds the *ap.meta).
+    Bin location (engram vs NAS) is resolved separately by locate_bin so the
+    staging decision can be made before committing to a NAS copy.
+    """
     data_path_list, save_out_path, plot_save_out_path = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
 
     if len(data_path_list) == 1:
-        data_path = data_path_list[0]
+        session_dir = Path(data_path_list[0])
         save_out_path = save_out_path[0]
         plot_save_out_path = plot_save_out_path[0]
     else:
         raise ValueError('Multiple or no data paths found for given monkey and date')
-    
-    output_path = data_path / "dartsort_output"
+
+    engram_rec_dir = find_recording_dir(session_dir)
+
+    output_path = engram_rec_dir / "dartsort_output"
     output_path.mkdir(exist_ok=True)
 
-    return data_path, save_out_path, plot_save_out_path, output_path
+    return engram_rec_dir, save_out_path, plot_save_out_path, output_path
 
-def prep_dartsort(data_path: Path, output_path: Path, save_preprocessed_data: bool = False, remove_bad_channels: bool = True) -> si.BaseRecording:
-    """Load SpikeGLX recording and apply IBL-style preprocessing (highpass, phase shift, zscore).
-    If save_preprocessed_data=True, caches the binary to data_path/rec_ppx for reuse by Kilosort.
-    Saves geom.npy and bad_channels.npy to output_path for downstream use."""
 
-    rec = si.read_spikeglx(data_path, stream_id="imec0.ap")
+def prep_dartsort(bin_dir: Path, output_path: Path, remove_bad_channels: bool = True) -> si.BaseRecording:
+    """Load the SpikeGLX recording from bin_dir and apply IBL-style preprocessing
+    (highpass, phase shift, bad-channel removal, spatial filter, zscore).
 
-    if save_preprocessed_data and (data_path / "rec_ppx").exists():
-        rec = si.read_binary_folder(data_path / "rec_ppx")
-    else:
-        rec = si.highpass_filter(rec)
-        rec = si.phase_shift(rec)
-        bad_channel_ids, channel_labels = si.detect_bad_channels(rec)
-        if remove_bad_channels:
-            rec = rec.remove_channels(bad_channel_ids)
-        rec = si.highpass_spatial_filter(rec)
-        rec = si.zscore(rec, num_chunks_per_segment=50, mode="mean+std")
+    bin_dir is where the raw *ap.bin lives (engram or a NAS copy — the same binary
+    either way). Saves geom.npy and bad_channels.npy to output_path for downstream use."""
 
-        # Save bad channels and geometry for downstream use
-        np.save(output_path / 'bad_channels.npy', bad_channel_ids)
+    rec = si.read_spikeglx(bin_dir, stream_id="imec0.ap")
 
-        if save_preprocessed_data:
-            n_cpus, _ = detect_compute_resources()
-            rec = rec.save(folder=data_path / "rec_ppx", n_jobs=n_cpus, chunk_duration="1s")
+    rec = si.highpass_filter(rec)
+    rec = si.phase_shift(rec)
+    bad_channel_ids, channel_labels = si.detect_bad_channels(rec)
+    if remove_bad_channels:
+        rec = rec.remove_channels(bad_channel_ids)
+    rec = si.highpass_spatial_filter(rec)
+    rec = si.zscore(rec, num_chunks_per_segment=50, mode="mean+std")
 
+    # Save bad channels and geometry for downstream use
+    np.save(output_path / 'bad_channels.npy', bad_channel_ids)
     np.save(output_path / 'geom.npy', rec.get_channel_locations())
 
     return rec
@@ -193,13 +196,6 @@ def compute_registered_channels(
     ], dtype=int)
     return max_channels_registered
 
-def detect_compute_resources() -> tuple[int, int]:
-    """Detect available CPUs and GPUs, respecting SLURM allocations."""
-    n_cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', os.cpu_count() or 1))
-    n_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
-    logger.info(f"Detected {n_cpus} CPUs, {n_gpus} GPUs")
-    return n_cpus, n_gpus
-
 def get_initial_detections(output_path: Path, rec: si.BaseRecording) -> DARTsortSorting:
     """Load existing subtraction.h5 if available, otherwise run dartsort.subtract."""
     n_cpus, n_gpus = detect_compute_resources()
@@ -242,81 +238,78 @@ def is_session_complete(output_path: Path) -> bool:
         return False
     return True
 
-def stage_recording_locally(rec: si.BaseRecording, data_path: Path) -> si.BaseRecording:
-    """Save preprocessed recording to local staging for fast I/O during subtraction."""
-    n_cpus, _ = detect_compute_resources()
-    job_id = os.environ.get('SLURM_JOB_ID', os.getpid())
-    local_dir = LOCAL_STAGING_ROOT / f"dartsort_{job_id}" / data_path.name / "rec_ppx"
-    if local_dir.exists():
-        logger.info(f"Loading existing local cache: {local_dir}")
-        return si.read_binary_folder(local_dir)
-    try:
-        local_dir.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Staging preprocessed recording to {local_dir}")
-        rec = rec.save(folder=local_dir, n_jobs=n_cpus, chunk_duration="1s", dtype="float16")
-        logger.info(f"Staging complete: {local_dir}")
-    except OSError as e:
-        logger.warning(f"Local staging failed ({e}) — running directly from network path")
-        shutil.rmtree(local_dir, ignore_errors=True)
-    return rec
+def run_dartsort(monkey: str, date: str, override: bool = False, keep_stage: bool = False) -> None:
+    """Run full dartsort pipeline: preprocess, subtract, save, register, and plot.
 
-def cleanup_local_staging() -> None:
-    """Remove local staging directory for this job."""
-    job_id = os.environ.get('SLURM_JOB_ID', os.getpid())
-    local_dir = LOCAL_STAGING_ROOT / f"dartsort_{job_id}"
-    if local_dir.exists():
-        shutil.rmtree(local_dir)
-        logger.info(f"Cleaned up local staging: {local_dir}")
+    Staging mirrors run_kilosort: every session is preprocessed and staged to fast
+    disk. The destination is independent of where the raw .bin lives — choose_stage_mode
+    claims the node's single /local slot (float16) when free, else falls back to engram
+    float32. A session-named staged copy is reused if a complete one already exists.
+    The staged copy is removed after the run unless keep_stage=True.
+    """
+    logger.info(f"Starting dartsort pipeline for {monkey} {date} (keep_stage={keep_stage})")
 
-def run_dartsort(monkey: str, date: str, override: bool = False) -> None:
-    """Run full dartsort pipeline: preprocess, subtract, save, register, and plot."""
-    logger.info(f"Starting dartsort pipeline for {monkey} {date}")
-
-    data_path, save_out_path, plot_save_out_path, output_path = resolve_dartsort_path(monkey, date)
-    logger.info(f"Resolved paths: data={data_path}, save_out={save_out_path}, plot_save_out={plot_save_out_path}")
+    engram_rec_dir, save_out_path, plot_save_out_path, output_path = resolve_dartsort_path(monkey, date)
+    logger.info(f"Resolved paths: engram_rec={engram_rec_dir}, save_out={save_out_path}, "
+                f"plot_save_out={plot_save_out_path}, output={output_path}")
 
     if is_session_complete(output_path) and not override:
         logger.info(f"Session already complete, skipping {monkey} {date}")
         return
 
-    rec = prep_dartsort(data_path, output_path, save_preprocessed_data=False, remove_bad_channels=True)
-    logger.info("Preprocessing completed")
+    session = engram_rec_dir.name
 
-    plot_traces(rec, plot_save_out_path)
-    logger.info("Trace plot completed")
+    # Locate the raw .bin (engram vs NAS). on_engram only governs which source we
+    # read from below; the staging destination is decided independently.
+    on_engram, nas_copies = locate_bin(engram_rec_dir, monkey)
+    stage_mode = choose_stage_mode(session=session)  # may CLAIM the /local slot
+    logger.info(f"bin_on_engram={on_engram}, nas_copies={len(nas_copies)}, stage_mode={stage_mode}")
 
-    if (output_path / "subtraction.h5").exists() and not override:
-        initial_detections = get_initial_detections(output_path, rec)
-        logger.info("Subtraction results already exist, skipping subtraction step")
-    else: 
-        try:
-            rec = stage_recording_locally(rec, data_path)
-            logger.info("Local staging completed")
+    # A claimed /local slot (or any staged dir) must be released, so everything
+    # below runs under the try/finally that calls cleanup_staging (unless kept).
+    try:
+        bin_dir = engram_rec_dir if on_engram else pick_nas_copy(nas_copies)
+
+        rec = prep_dartsort(bin_dir, output_path, remove_bad_channels=True)
+        logger.info("Preprocessing completed")
+
+        plot_traces(rec, plot_save_out_path)
+        logger.info("Trace plot completed")
+
+        if (output_path / "subtraction.h5").exists() and not override:
+            initial_detections = get_initial_detections(output_path, rec)
+            logger.info("Subtraction results already exist, skipping subtraction step")
+        else:
+            rec = stage_recording(rec, stage_mode, engram_rec_dir, session)
+            logger.info("Staging completed")
             initial_detections = get_initial_detections(output_path, rec)
             logger.info("Spike subtraction completed")
-        finally:
-            cleanup_local_staging()
-            logger.info("Local staging cleanup completed")
 
-    motion_est = run_registration(initial_detections, rec)
-    logger.info("Motion registration completed")
+        motion_est = run_registration(initial_detections, rec)
+        logger.info("Motion registration completed")
 
-    max_channels_registered = compute_registered_channels(initial_detections, rec, motion_est)
-    logger.info("Registered channels computed")
+        max_channels_registered = compute_registered_channels(initial_detections, rec, motion_est)
+        logger.info("Registered channels computed")
 
-    # Save all results
-    save_results(initial_detections, output_path)
-    np.save(output_path / 'max_channels_registered.npy', max_channels_registered)
-    pickle.dump(motion_est, open(output_path / "motion_est.pkl", "wb"))
-    logger.info("Results saved")
+        # Save all results
+        save_results(initial_detections, output_path)
+        np.save(output_path / 'max_channels_registered.npy', max_channels_registered)
+        pickle.dump(motion_est, open(output_path / "motion_est.pkl", "wb"))
+        logger.info("Results saved")
 
-    # Plots
-    plot_unregistered_positions(initial_detections, output_path)
-    plot_registration(initial_detections, motion_est, output_path)
-    logger.info("Plots completed")
+        # Plots
+        plot_unregistered_positions(initial_detections, output_path)
+        plot_registration(initial_detections, motion_est, output_path)
+        logger.info("Plots completed")
+    finally:
+        if keep_stage:
+            logger.info("keep_stage=True: leaving staged copy in place (slot NOT released)")
+        else:
+            cleanup_staging(stage_mode, engram_rec_dir, session)
+            logger.info("Staging cleanup completed")
 
     logger.info("Pipeline finished")
-    
+
     if is_session_complete(output_path):
         logger.info(f"Session successfully completed: {monkey} {date}")
         (output_path / "subtraction.h5").unlink(missing_ok=True)  # Remove large intermediate file to save space
@@ -331,6 +324,9 @@ if __name__ == '__main__':
     parser.add_argument('--monkey', type=str, required=True, help='Monkey name')
     parser.add_argument('--date', type=str, required=True, help='Recording date (YYYYMMDD)')
     parser.add_argument('--override', action='store_true', help='Override existing outputs and rerun entire pipeline')
+    parser.add_argument('--keep-stage', dest='keep_stage', action='store_true',
+                        help='Do not remove the staged copy after the run (and do not '
+                             'release the /local slot), so it can be reused by a later run')
     args = parser.parse_args()
 
-    run_dartsort(args.monkey, args.date, override=args.override)
+    run_dartsort(args.monkey, args.date, override=args.override, keep_stage=args.keep_stage)

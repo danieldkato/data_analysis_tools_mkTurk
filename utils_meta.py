@@ -286,7 +286,42 @@ def find_channels(directory, prefix=None):
     return chans
 
 
-def get_all_metadata_sess(preprocessed_data_path):
+def find_units(directory: str, suffix: str = '_psth_stim') -> np.ndarray:
+    """
+    Find sorted-unit (Kilosort cluster) indices for which input directory
+    contains preprocessed data. Unit analogue of find_channels(): assumes the
+    directory holds one file per unit named 'clu<nnn>_psth_stim', as written by
+    analyze_bystim() for source='kilosort'. Cluster ids are zero-padded to a
+    minimum of 3 digits but may be wider, so this matches a variable-width id.
+
+    Parameters
+    ----------
+    directory : str
+        Path to directory to search (e.g. <save_out>/kilosort4).
+
+    suffix : str, optional
+        String that must immediately follow the unit number, used to restrict
+        the search to PSTH files. The default is '_psth_stim'.
+
+    Returns
+    -------
+    units : numpy.ndarray
+        Sorted array of cluster ids in the directory.
+    """
+    # Match 'clu' followed by a variable-width id and the requested suffix:
+    regex = r'clu(\d+)' + re.escape(suffix)
+
+    # List directory contents:
+    filenames = os.listdir(directory)
+
+    # Extract cluster ids from matching filenames:
+    indices = [int(re.search(regex, x).group(1)) for x in filenames if re.search(regex, x) is not None]
+    units = np.unique(indices)
+
+    return units
+
+
+def get_all_metadata_sess(preprocessed_data_path, stim_meta_dir=None):
 
     files = os.listdir(preprocessed_data_path)
 
@@ -296,9 +331,14 @@ def get_all_metadata_sess(preprocessed_data_path):
 
     # Get stim metadata:
     psth_stim_meta_regex = 'psth_stim_meta'
+    stim_meta_path_dir = preprocessed_data_path
     psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in files if re.search(psth_stim_meta_regex,x) is not None]
+    # Fall back to stim_meta_dir (e.g. the kilosort4 subdir) for ks-only sessions:
+    if not psth_stim_meta_matches and stim_meta_dir is not None and os.path.isdir(stim_meta_dir):
+        psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in os.listdir(stim_meta_dir) if re.search(psth_stim_meta_regex,x) is not None]
+        stim_meta_path_dir = stim_meta_dir
     stim_meta_file = psth_stim_meta_matches[0] # < Assume metadata is the same for all channels
-    stim_meta_path = os.path.join(preprocessed_data_path, stim_meta_file) # < Hack; assuming this always exists
+    stim_meta_path = os.path.join(stim_meta_path_dir, stim_meta_file) # < Hack; assuming this always exists
     stim_meta = pickle.load(open(stim_meta_path, 'rb'))
 
     # Get scenefile metadata:

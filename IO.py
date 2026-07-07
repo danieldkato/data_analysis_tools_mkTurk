@@ -14,9 +14,10 @@ import numpy as np
 import pandas as pd
 import json
 from itertools import product
-from .utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
+from .utils_meta import find_channels, find_units, get_recording_path, get_coords_sess, get_all_metadata_sess
 from .stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
 from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords
+from .spike_sorting.quality_metrics import build_unit_info_dfs
 from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
@@ -25,31 +26,42 @@ except ImportError:
 
 
 
-def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None, 
-    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None):
+def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
+    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None,
+    source='mua'):
     """
-    Combine pickled dicts of single-channel PSTHs into single HDF5. 
+    Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
 
     Parameters
     ----------
     base_data_path : str
-        Path to directory where raw data files are saved. One level above 
+        Path to directory where raw data files are saved. One level above
         monkey-level directories.
-    
+
     monkey : str
         Monkey name.
-    
+
     date : str
         Session date, formatted <yyyymmdd>.
-    
-    preprocessed_data_path : str 
-        Path to where preprocessed data files (e.g. 'ch<iii>_psth_stim') are saved. 
-        Must contain file named 'data_dict_<sess>', where <sess> is the name of 
+
+    preprocessed_data_path : str
+        Path to where preprocessed data files (e.g. 'ch<iii>_psth_stim') are saved.
+        Must contain file named 'data_dict_<sess>', where <sess> is the name of
         the directory immediately containing the raw data for the session. .
-    
+
     channels : array-like, optional
-        Array of channels indices to include data from. The default is None.
-    
+        Array of entity indices to include data from. When source='mua' these are
+        SpikeGLX channel indices; when source='ks' these are Kilosort cluster ids.
+        If None, the entities are discovered from the per-entity PSTH files in the
+        appropriate directory. The default is None.
+
+    source : 'mua' | 'ks', optional
+        Which preprocessed PSTHs to combine. 'mua' uses per-channel files named
+        'ch<nnn>_psth_stim' in preprocessed_data_path (fixed channel count;
+        original behavior). 'ks' uses per-unit files named 'clu<nnn>_psth_stim'
+        in <preprocessed_data_path>/kilosort4 (variable number of sorted units on
+        axis-0 of the data slab). The default is 'mua'.
+
     chunk_size : int, optional
         Number of trials to include in a singl HDF5 chunk. Can have up to 2-3x
         impact on read/write speeds. The default is 100.
@@ -105,12 +117,12 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         preprocessed_data_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
     
     pen_id = preprocessed_data_path.split(os.path.sep)[-1]
-    
-    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
-    
+
     # Load metadata for current session
+    # For source='ks', fall back to the kilosort4 subdir for psth_stim_meta (ks-only sessions).
+    stim_meta_dir = os.path.join(preprocessed_data_path, 'kilosort4') if source == 'ks' else None
     recording_dir = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0].split(os.sep)[-1]
-    sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
+    sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path, stim_meta_dir=stim_meta_dir)
     sess_meta_df = sess_meta_dict_2_df(sess_meta)
     stim_ids = list(sess_meta.keys()) # < Get list of all individual stimulus conditions
     data_dict_path = os.path.join(preprocessed_data_path, 'data_dict_' + recording_dir)
@@ -233,25 +245,64 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         imro_tbl = pd.DataFrame()
         warnings.warn('No .ap.meta file discovered for {} session {}.'.format(monkey, date))
         
+    # Resolve which directory and per-entity filename prefix to read PSTHs from.
+    # source='mua' reads per-channel files ('ch<nnn>_psth_stim') directly from
+    # preprocessed_data_path; source='ks' reads per-unit files ('clu<nnn>_psth_stim')
+    # from the kilosort4 subdir, where the number of entities (sorted units) varies
+    # by session rather than being a fixed channel count.
+    match source:
+        case 'mua':
+            psth_dir = preprocessed_data_path
+            entity_prefix = 'ch'
+        case 'ks':
+            psth_dir = os.path.join(preprocessed_data_path, 'kilosort4')
+            entity_prefix = 'clu'
+        case _:
+            raise ValueError("source must be 'mua' or 'ks', got {}".format(source))
+
     # Initialize data array:
     if channels is None:
-        channels = find_channels(preprocessed_data_path)
+        if source == 'mua':
+            channels = find_channels(preprocessed_data_path)
+        else:
+            channels = find_units(psth_dir)
+
+    # For single units, assemble the per-unit metrics tables (one row per unit,
+    # raw metrics only) and align them to the unit order on axis-0 of the slab so
+    # good-unit filtering and spatial lookups can be applied later from the H5
+    # alone. Two tables by purpose: unit_quality (is_good_unit inputs + KSLabel)
+    # and unit_spatial (probe location + amplitude). Missing metric files are
+    # tolerated (filled with NaN) inside build_unit_info_dfs.
+    unit_quality_df = None
+    unit_spatial_df = None
+    if source == 'ks':
+        try:
+            unit_quality_df, unit_spatial_df = build_unit_info_dfs(psth_dir)
+            # Reindex to axis-0 unit order ('unit_id' index -> column):
+            unit_quality_df = unit_quality_df.reindex(np.asarray(channels)).reset_index()
+            unit_spatial_df = unit_spatial_df.reindex(np.asarray(channels)).reset_index()
+        except Exception as e:
+            unit_quality_df = pd.DataFrame()
+            unit_spatial_df = pd.DataFrame()
+            warnings.warn('Failed to build unit metrics tables for {} {}: {}'.format(monkey, date, e))
+
     n_bins = len(psth_bins) - 1
     n_trials = np.max(trial_params_df['trial_num']) + 1
     n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
     
-    # Iterate over channels:
+    # Iterate over entities (channels for source='mua', sorted units for source='ks'):
+    entity_label = 'unit' if source == 'ks' else 'channel'
     input_files = []
     for cx, channel in enumerate(channels):
-        
-        print('Loading data for channel {} of {}...'.format(cx+1, len(channels)))
-        
-        # Load data for current channel:
-        stim_fname = 'ch{}'.format(str(channel).zfill(3)) + '_psth_stim'
-        fullpath = os.path.join(preprocessed_data_path, stim_fname)
-        curr_ch_dict = pickle.load(open(fullpath,'rb')) 
+
+        print('Loading data for {} {} of {}...'.format(entity_label, cx+1, len(channels)))
+
+        # Load data for current entity:
+        stim_fname = '{}{}'.format(entity_prefix, str(channel).zfill(3)) + '_psth_stim'
+        fullpath = os.path.join(psth_dir, stim_fname)
+        curr_ch_dict = pickle.load(open(fullpath,'rb'))
         input_files.append(fullpath)
             
         # Iterate over stimulus conditions:
@@ -286,9 +337,15 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         output_path = os.path.join(output_directory, fname+'.h5') 
         
         print('Saving HDF5 to disk...')
+        # NOTE: the h5py datasets/attrs and the pandas (PyTables) dataframes are
+        # written in two separate phases. Calling DataFrame.to_hdf() while the
+        # h5py handle below is still open would open the same file twice at once,
+        # which fails on network filesystems (SMB/NFS) with an HDF5 file-lock
+        # error ("unable to lock the file, errno = 11"). The h5py block therefore
+        # closes before any to_hdf() call runs.
         with h5py.File(output_path, 'w') as f:
             #dset = f.create_dataset('data', data=spike_counts, dtype='int32')
-            
+
             # Define chunk size:
             if chunk_size is True:
                 spike_chunks = True
@@ -299,34 +356,15 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             else:
                 spike_chunks = (spike_counts.shape[0], spike_counts.shape[1], chunk_size, spike_counts.shape[3])
                 stim_id_chunks = (chunk_size, stim_indices.shape[1])
-            
+
             # Create dataset containing actual spike counts:
             dset = f.create_dataset('data', data=spike_counts, dtype=dtype, rdcc_nbytes=8*(10**9)*3, chunks=spike_chunks)
             #dset.attrs['trial_df'] = trial_df
-            
+
             # Write scenefile-by-stim_id boolean matrix specifying which stim
             # came from which scenefiles:
             scenefile_lookup = f.create_dataset('stim_indices', data=stim_indices, dtype=dtype, chunks=stim_id_chunks)
-            
-            # Write full dataframe of trial parameters:
-            trial_params_df_out = trial_params_df.copy()
-            trial_params_df_out = standardize_col_types(trial_params_df_out)
-            trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
-            
-            #"""
-            # Write truncated dataframe of select trial parameters:
-            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
-            if 'img_full_path' in trial_params_df.columns:
-                short_cols.append('img_full_path')
-            trial_params_short = trial_params_df[short_cols] 
-            trial_params_short = trial_params_short.rename(columns={'stim_info_short' : 'stim_id'})
-            trial_params_short.to_hdf(output_path, 'trial_params_short', 'a', format='fixed')
-            #"""
-            
-            # Write channel coordinates:
-            zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
-            imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
-            
+
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
             f.attrs['binwidth'] = bin_width
@@ -337,8 +375,45 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             f.attrs['stim_ids'] = stim_ids
             f.attrs['scenefiles'] = scenefiles
             f.attrs['scenefile_by_stim_mat'] = scenefile_mat
-            
-            
+
+            # Record which entities populate axis-0 of the data slab. For source='ks'
+            # also store the cluster ids, since (unlike channels) the unit count is
+            # variable and the ids are not implied by position.
+            f.attrs['source'] = source
+            if source == 'ks':
+                f.attrs['unit_ids'] = np.asarray(channels)
+
+        # h5py handle is now closed; append the pandas dataframes (PyTables) to
+        # the same file, one open at a time.
+
+        # Write full dataframe of trial parameters:
+        trial_params_df_out = trial_params_df.copy()
+        trial_params_df_out = standardize_col_types(trial_params_df_out)
+        trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
+
+        #"""
+        # Write truncated dataframe of select trial parameters:
+        short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
+        if 'img_full_path' in trial_params_df.columns:
+            short_cols.append('img_full_path')
+        trial_params_short = trial_params_df[short_cols]
+        trial_params_short = trial_params_short.rename(columns={'stim_info_short' : 'stim_id'})
+        trial_params_short.to_hdf(output_path, 'trial_params_short', 'a', format='fixed')
+        #"""
+
+        # Write channel coordinates:
+        zero_coords.to_hdf(output_path, key='zero_coordinates', mode='a', format='fixed')
+        imro_tbl.to_hdf(output_path, key='imro_table', mode='a', format='fixed')
+
+        # For single units, write the per-unit metrics tables (each row-aligned
+        # to axis-0 of `data`): unit_quality for good-unit filtering downstream,
+        # unit_spatial for probe location / amplitude.
+        if source == 'ks':
+            if unit_quality_df is not None:
+                standardize_col_types(unit_quality_df.copy()).to_hdf(output_path, 'unit_quality', 'a', format='table')
+            if unit_spatial_df is not None:
+                standardize_col_types(unit_spatial_df.copy()).to_hdf(output_path, 'unit_spatial', 'a', format='table')
+
         if 'analysis_metadata' in sys.modules:
             M = Metadata()
             for i in input_files:
@@ -768,11 +843,34 @@ def standardize_col_types(df):
         
         # If all non-NaNs are arrays:
         if np.all(df[~df[col].isna()][col].apply(lambda x : type(x)==np.ndarray)):
-            
+
             # If all arrays are singleton:
             if np.all(df[~df[col].isna()][col].apply(lambda x : len(x)==1)):
                 df[col] = df.apply(lambda x : x[col][0] if type(x[col])==np.ndarray else x[col], axis=1)
-                
+
+    # Second pass: catch object columns PyTables can't serialize with
+    # format='table' even when they are NOT multi-type. A column that is uniformly
+    # dict / list / nested (e.g. a behavior field like SampleStartTime that comes
+    # back as a dict in some files) has typenum==1 and so is missed above, but
+    # to_hdf(format='table') still raises "Cannot serialize the column". Coerce any
+    # object column holding non-scalar values: to numeric if possible (malformed
+    # entries -> NaN), otherwise to string.
+    def _is_nonscalar(x):
+        return isinstance(x, (dict, list, tuple, set, np.ndarray))
+
+    for col in df.columns:
+        if df[col].dtype != object:
+            continue
+        if df[col].apply(_is_nonscalar).any():
+            coerced = pd.to_numeric(df[col], errors='coerce')
+            # Use the numeric coercion only if it preserved the real (scalar) values;
+            # if everything became NaN the column was non-numeric, so stringify instead.
+            scalar_mask = ~df[col].apply(_is_nonscalar) & df[col].notna()
+            if scalar_mask.any() and coerced[scalar_mask].notna().all():
+                df[col] = coerced
+            else:
+                df[col] = df[col].apply(lambda x : '' if _is_nonscalar(x) else x).astype(str)
+
     return df
 
 
@@ -1217,6 +1315,42 @@ def stim_idx_2_img_path(sfile_img_dir, stim_idx):
 
 
 
+def coerce_trial_timing(value: dict | list | np.ndarray, n_trials: int) -> np.ndarray:
+    """Normalize a per-trial timing field to a flat float array of length n_trials.
+
+    Behavior files occasionally store a timing field (e.g. SampleStartTime) as a
+    dict or a short/ragged list rather than one value per trial. np.array() then
+    yields a 0-d or wrong-length array that breaks downstream arithmetic. This
+    coerces `value` to a length-n_trials float array: parses numerics
+    (errors -> NaN), and pads/truncates to n_trials, NaN-filling anything missing.
+
+    Parameters
+    ----------
+    value : dict | list | array-like
+        Raw TRIALEVENTS timing field for one behavior file.
+    n_trials : int
+        Number of trials (use a reliably per-trial field such as NReward).
+
+    Returns
+    -------
+    numpy.ndarray
+        Float array of shape (n_trials,).
+    """
+    if isinstance(value, dict):
+        vals = np.empty(0, dtype=float)
+    else:
+        arr = pd.to_numeric(pd.Series(value).squeeze(), errors='coerce')
+        vals = np.asarray(arr, dtype=float).ravel()
+
+    if vals.shape[0] == n_trials:
+        return vals
+
+    out = np.full(n_trials, np.nan)
+    out[:min(len(vals), n_trials)] = vals[:n_trials]  # keep what aligns, NaN the rest
+    return out
+
+
+
 def find_complete_rsvp_slots(bfile):
 
     # Get some scene metadata:
@@ -1233,17 +1367,25 @@ def find_complete_rsvp_slots(bfile):
     # Get single-trial data:
     trial_df = pd.DataFrame()
 
-    # Get trial timing data: 
-    start_time = np.array(bfile['TRIALEVENTS']['StartTime'])
-    sample_start_time = np.array(bfile['TRIALEVENTS']['SampleStartTime'])
-    reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
-    end_time = np.array(bfile['TRIALEVENTS']['EndTime'])
+    # Get trial timing data. Some behavior files have a malformed timing field
+    # (e.g. SampleStartTime stored as a dict instead of a per-trial list), which
+    # np.array() turns into a 0-d / object array of the wrong length and breaks the
+    # arithmetic below. coerce_trial_timing() normalizes each field to a flat float
+    # array of length n_trials (reward/NReward is reliably per-trial), NaN-filling
+    # where it can't be parsed.
     reward = np.array(bfile['TRIALEVENTS']['NReward'])
+    n_trials = len(reward)
+
+    start_time = coerce_trial_timing(bfile['TRIALEVENTS']['StartTime'], n_trials)
+    sample_start_time = coerce_trial_timing(bfile['TRIALEVENTS']['SampleStartTime'], n_trials)
+    reinforcement_time = coerce_trial_timing(bfile['TRIALEVENTS']['ReinforcementTime'], n_trials)
+    end_time = coerce_trial_timing(bfile['TRIALEVENTS']['EndTime'], n_trials)
+    reward = coerce_trial_timing(np.array(bfile['TRIALEVENTS']['NReward'], n_trials)
     trial_df['start_time'] = start_time
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
     trial_df['end_time'] = end_time
-    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre + 16 # HACK!!! Hard-coding assumed 16-ms (1-frame) quantization effect; West rewarded RSVP trials have nominal duration of ~884 ms instead of expected 900; single frame drop? 
+    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre + 16 # HACK!!! Hard-coding assumed 16-ms (1-frame) quantization effect; West rewarded RSVP trials have nominal duration of ~884 ms instead of expected 900; single frame drop?
     trial_df['trial_rewarded'] = reward.astype(bool)
     trial_df['trial_num'] = np.arange(trial_df.shape[0])
 
@@ -1255,33 +1397,37 @@ def find_complete_rsvp_slots(bfile):
     for c, col in enumerate(stim_cols):
         trial_df[col] = sample_idx_ar[c]
 
-    # Get scenefiles of each RSVP slot (should be the same for all slots within a trial):
+
+    # Get scenefile and stim duration of each RSVP slot. Unlike the original
+    # version, slots within a trial may come from *different* scenefiles (some
+    # experiments draw one image per slot from a different scenefile), so the
+    # scenefile and duration are tracked per slot rather than asserted equal.
     dur_cols = []
     offsets = np.cumsum(scene_df.nstim) - 1
     get_sfile_index = lambda x : min(np.where(offsets.values >= x)[0])
     for c, col in enumerate(stim_cols):
 
-        curr_sfile_colname = 'sfile'+str(c) 
+        curr_sfile_colname = 'sfile'+str(c)
         curr_dur_colname = 'stim{}_duration'.format(c)
         dur_cols.append(curr_dur_colname)
         trial_df[curr_sfile_colname] = list(map(get_sfile_index, trial_df[col].values))
-        
-        # Merge stim duration for each slot:        
-        trial_df = pd.merge(trial_df, 
-                            scene_df[['scenefile_idx', 'stim_duration']].rename(columns={'scenefile_idx':curr_sfile_colname}), 
+
+        # Merge stim duration for each slot:
+        trial_df = pd.merge(trial_df,
+                            scene_df[['scenefile_idx', 'stim_duration']].rename(columns={'scenefile_idx':curr_sfile_colname}),
                             on=curr_sfile_colname)\
                         .rename(columns={'stim_duration':curr_dur_colname})
-        
-    # Aggregate stimulus durations into single array:
+
+    # Aggregate stimulus durations into single array (leading 0 so cumsum gives slot boundaries):
     trial_df['stim_durs'] = trial_df.apply(lambda x : np.array([0] + [x[col] for col in dur_cols]), axis=1)
 
-    # Verify that all stim within a trial are from the same scenefile:
-    trial_df['n_stim_complete'] = trial_df.apply(lambda x : 
-        max(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0])+1 
-        if len(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0]) > 0 
+    # Compute number of completed stim from the per-slot duration cumsum:
+    trial_df['n_stim_complete'] = trial_df.apply(lambda x :
+        max(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0])+1
+        if len(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0]) > 0
         else 0, axis=1)
 
-    # Expand trials to individual slots:
+    # Expand trials to individual slots, assigning each slot its own scenefile_idx:
     T = []
     for t in np.arange(n_slots):
         base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['stim_durs', 'n_stim_complete']
