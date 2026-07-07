@@ -10,6 +10,7 @@ from numpy.matlib import repmat
 import openpyxl
 import datetime
 import warnings
+from .utils_meta import get_recording_path
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
     refID=0, ap_gain=500, lf_gain=250, ap_highpass=True, output_directory=None):
