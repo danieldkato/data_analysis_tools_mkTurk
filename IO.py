@@ -1380,7 +1380,7 @@ def find_complete_rsvp_slots(bfile):
     sample_start_time = coerce_trial_timing(bfile['TRIALEVENTS']['SampleStartTime'], n_trials)
     reinforcement_time = coerce_trial_timing(bfile['TRIALEVENTS']['ReinforcementTime'], n_trials)
     end_time = coerce_trial_timing(bfile['TRIALEVENTS']['EndTime'], n_trials)
-    reward = coerce_trial_timing(np.array(bfile['TRIALEVENTS']['NReward'], n_trials)
+    reward = coerce_trial_timing(np.array(bfile['TRIALEVENTS']['NReward'], n_trials))
     trial_df['start_time'] = start_time
     trial_df['sample_start_time'] = sample_start_time
     trial_df['reinforcement_time'] = reinforcement_time
