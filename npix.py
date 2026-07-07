@@ -1450,7 +1450,6 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             curr_df['cluster_label'] = None
             for c, col in enumerate(coarse_cluster_label_cols):
                 curr_cluster_label = coarse_cluster_labels[c]
-
                 curr_inds_str = row[col]
 
                 # If no channels of current cluster, move to next cluster:
@@ -1474,8 +1473,6 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
 
     # Concatenate cluster labels across sessions:
     df_out = pd.concat(dfs, axis=0)
-
-    # Try to retrieve some metadata for latest version of CSV file:
     csv_meta = dict()
 
     mtime = os.path.getmtime(csv_path)
