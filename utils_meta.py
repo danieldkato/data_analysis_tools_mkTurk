@@ -8,7 +8,8 @@ import re
 from natsort import os_sorted
 import pickle
 import json
-from utils_mkturk import gen_scene_df, gen_short_scene_info
+from .utils_mkturk import gen_scene_df, gen_short_scene_info
+#from data_analysis_tools_mkTurk.utils_mkturk import * 
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
@@ -20,7 +21,7 @@ def get_recording_path(base_data_path, monkey, date,depth = 4):
     for long_path in long_paths:
         sub_lists = [x[0] for x in os.walk(long_path) if len(Path(x[0]).parents)-len(Path(base_data_path).parents) ==depth]
         for s in sub_lists:
-            result = re.search('\Dep(.*?)\_', Path(s).name)
+            result = re.search(r'\Dep(.*?)\_', Path(s).name)
             if result is not None and 'dk' not in Path(s).name:
                 depth_start = result.group(1).split('-')[0]
                 depth_end = result.group(1).split('-')[1]
@@ -134,17 +135,16 @@ def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
-
     name = Path(data_path).name
     
     # Define field names and corresponding search patterns:
-    patterns = {'hole_id' : '_H\d+\.*\d*_', 
-                'penetration' : '_P\d+\.*\d*_', 
-                'AP' : 'AP-{0,1}\d+\.*\d*', 
-                'DV' : 'DV-{0,1}\d+\.*\d*', 
-                'ML' : 'ML-{0,1}\d+\.*\d*', 
-                'Ang'  : '[^H]Ang-*\d+\.*\d', 
-                'HAng' : 'HAng-*\d+\.*\d*'}
+    patterns = {'hole_id' : r'_H\d+\.*\d*_', 
+                'penetration' : r'_P\d+\.*\d*_', 
+                'AP' : r'AP-{0,1}\d+\.*\d*', 
+                'DV' : r'DV-{0,1}\d+\.*\d*', 
+                'ML' : r'ML-{0,1}\d+\.*\d*', 
+                'Ang'  : r'[^H]Ang\d+\.*\d', 
+                'HAng' : r'HAng\d+\.*\d*'}
     regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
@@ -152,26 +152,26 @@ def get_coords_sess(base_data_path, monkey, date):
     for idx, row in regex_lut.iterrows():
         matches = re.findall(row.regex, name)
         if len(matches) == 1:
-            val = float(re.search('-{0,1}\d+\.*\d*', matches[0]).group())
+            val = float(re.search(r'-{0,1}\d+\.*\d*', matches[0]).group())
         else:
             val = None
         zero_coord_series[idx] = val
 
     # Find depth (requires separate treatment from other numeric parameters bc
     # filenames include both starting and stop depth):
-    depth_regex = 'Dep\d+-\d+'
+    depth_regex = r'Dep\d+-\d+'
     depth_matches = re.findall(depth_regex, name)
     if len(depth_matches) == 1:
-        depth_vals = re.findall('\d+', depth_matches[0])
+        depth_vals = re.findall(r'\d+', depth_matches[0])
         depth = float(depth_vals[1])
     else:
         depth = None
     zero_coord_series['depth'] = depth
         
     # Find brain hemisphere:
-    hemisphere_str = re.findall('_(L|R)_', name)
+    hemisphere_str = re.findall(r'_(L|R)_', name)
     if len(hemisphere_str) == 1:
-        hemisphere = re.search('(L|R)', hemisphere_str[0]).group()
+        hemisphere = re.search(r'(L|R)', hemisphere_str[0]).group()
     else:
         hemisphere = None
     zero_coord_series['hemisphere'] = hemisphere
@@ -273,7 +273,7 @@ def find_channels(directory, prefix=None):
         prefix = ''
 
     # Define regex:
-    regex = 'ch\d{3}' + prefix
+    regex = r'ch\d{3}' + prefix
 
     # List directory contents:
     filenames = os.listdir(directory)
@@ -321,6 +321,7 @@ def scenefile2rsvp_inds(data_dicts, scenefile):
 
     return A
 
+
 # read imroTbl 
 def read_imroTbl(meta):
     n_chans = int(meta['nSavedChans'])-1
@@ -337,6 +338,7 @@ def read_imroTbl(meta):
 
     return arr 
 
+
 def read_snsChanMap(meta):
     n_chans = int(meta['nSavedChans'])-1
     snsChanMap = re.findall(r'([0-9]*;[0-9]*:[0-9]*)',
@@ -350,6 +352,7 @@ def read_snsChanMap(meta):
 
     return arr 
 
+
 def get_chanmap(data_path):
     meta_iter = data_path.glob('*ap.meta')
     bin_iter = data_path.glob('*ap.bin')   
@@ -357,6 +360,7 @@ def get_chanmap(data_path):
     bin_path = next(bin_iter) 
 
     meta = readMeta(bin_path)
+
     if ('fileTimeSecs' in meta.keys()): 
         Fs = float(meta['imSampRate'])
         filesize = float(meta['fileSizeBytes'])
@@ -391,3 +395,4 @@ def get_chanmap(data_path):
     imroTbl = read_imroTbl(meta)
 
     return chanmap, imroTbl
+

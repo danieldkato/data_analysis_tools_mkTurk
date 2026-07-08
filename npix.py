@@ -9,8 +9,8 @@ import pandas as pd
 from numpy.matlib import repmat
 import openpyxl
 import datetime
-from data_analysis_tools_mkTurk.utils_meta import *
 import warnings
+from .utils_meta import get_recording_path
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
     refID=0, ap_gain=500, lf_gain=250, ap_highpass=True, output_directory=None):
@@ -269,7 +269,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         curr_coords_df['date'] = zero_coords.date
         chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
     
-    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
@@ -339,8 +339,9 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
-    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'ap', 'ml', 'dv', 'depth'], index=Chs)
+    coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
+    coords_df['bank'] = Banks
     coords_df['ap'] = Coords[:,0]
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]    
@@ -349,7 +350,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
-    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'ap', 'dv', 'ml', 'depth']]
+    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
     coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
@@ -392,7 +393,7 @@ def extract_imro_table(metadata_path):
         
     # Parse line defining IMRO table into a list of strings, each encoding a tuple
     imroTbl_str = imroTbl_lines[0]
-    r = re.search('\(', imroTbl_str).start() # Find index of first open parentheses
+    r = re.search(r'\(', imroTbl_str).start() # Find index of first open parentheses
     imroTbl_str = imroTbl_str[r:] # Retain first open parens and everything after
     tuple_strs = imroTbl_str.split('(')
     tuple_strs = tuple_strs[1:] # Cut off extraneous empty string at beginning
@@ -402,7 +403,7 @@ def extract_imro_table(metadata_path):
     for tx, t in enumerate(tuple_strs):
         
         # Chop off final end parens and anything afterwards (e.g. newline):
-        tail_start = re.search('\)', t).start()
+        tail_start = re.search(r'\)', t).start()
         head = t[0:tail_start]
         
         if tx == 0:
@@ -1143,7 +1144,10 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
         
         areas_hat_b = wkbkb_df.apply(lambda x : [] if type(x.areas)==float and np.isnan(x.areas) else x.areas, axis=1)
         wkbkb_df['areas'] = areas_hat_b
-        
+
+        chs_df["areas_x"] = chs_df["areas_x"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
+        chs_df["areas_y"] = chs_df["areas_y"].apply(lambda v: v if isinstance(v, list) else ([] if pd.isna(v) else [v]))
+
         # Merge area labels:
         A = chs_df.apply(lambda x : x.areas_x + x.areas_y, axis=1)
         chs_df['areas'] = A
@@ -1235,7 +1239,7 @@ def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker'
             # Iterate over brain areas (columns) of current date (row) of current monkey (sheet)
             for area in areas:
                 tmp = np.array([None]*n_chans)
-                ranges = re.findall('\d{1,3}-\d{1,3}', row[area]) if type(row[area])==str else []
+                ranges = re.findall(r'\d{1,3}-\d{1,3}', row[area]) if type(row[area])==str else []
                 for rn in ranges:
                     bounds = [int(s) for s in rn.split('-')]
                     mn = min(bounds)
@@ -1273,10 +1277,62 @@ def read_recording_coordinate_data_sheet(path=os.path.join('/', 'mnt', 'smb', 'l
     df['date'] = df.apply(lambda x : ''.join([x.dateparts[2].zfill(4), x.dateparts[0].zfill(2), x.dateparts[1].zfill(2)]) if x.dateparts is not None else None, axis=1)
     df = df.drop(columns='dateparts')
     
+    monkeys = df.monkey.unique()
+    Rs = []
+
+    for monkey in monkeys: 
+
+        curr_rows = df[df.monkey==monkey].copy()
+        
+        # Get experiment type for each row:
+        Expts = curr_rows.apply(lambda x : re.search(r'(E|L)\d{1,2}', x.Expt).group() if (type(x.Expt)==str and re.search(r'(E|L)\d{1,2}', x.Expt) is not None) else None, axis=1)
+        curr_rows['Expt_num'] = Expts
+        curr_rows.loc[curr_rows.apply(lambda x : type(x.Expt_num)==str and  'L' in x.Expt_num, axis=1), 'Expt_num'] = 'E1' # HACK; replace 'L<n>' with 'E1'; switched naming convention at some point
+        
+        # Try to get manually-entered series number for each row:
+        series_nums_manual = curr_rows.apply(lambda x : int(re.search(r'_\d{1,2}', x.Expt).group()[-2:]) if (type(x.Expt)==str and re.search(r'_\d{1,2}', x.Expt) is not None) else None, axis=1)
+        curr_rows['series_num_manual'] = series_nums_manual
+        
+        # Try to automatically get series number for each session: 
+        expt_nums = Expts.apply(lambda x : int(re.search(r'E\d{1,2}', x).group()[1:]) if (type(x)==str and re.search(r'E\d{1,2}', x) is not None) else -1)
+        dif = np.diff(expt_nums)
+        dif[dif!=0] = 1
+        series_start_inds_auto = np.concatenate([np.array([0]), np.where(dif)[0] + 1])
+        series_types = np.array(expt_nums.values[series_start_inds_auto])
+        C = [np.cumsum(series_types==s) for s in np.unique(series_types)] # For each series type of type s, compute how many series of type s have been completed by the start of series i 
+        D = [(series_types==tp)*C[t]  for t, tp in enumerate(np.unique(series_types))] # For each series of type s, ignore cumulative sums of number completed series of all other types 
+        S = np.sum(np.array(D), axis=0)
+        Sr = np.nan*np.ones(len(expt_nums))
+        for s, sstart in enumerate(series_start_inds_auto[:-1]):
+            Sr[series_start_inds_auto[s]:series_start_inds_auto[s+1]] = S[s]
+        curr_rows['series_num_auto'] = Sr - 1
+
+        # Use manual series number if possible; otherwise use auto-series number:
+        curr_rows['series_num'] = curr_rows.apply(lambda x : x.series_num_manual if ~np.isnan(x.series_num_manual) else x.series_num_auto, axis=1)
+        curr_rows.index = np.arange(curr_rows.shape[0])
+        curr_rows = curr_rows.drop(columns=['series_num_auto', 'series_num_manual']) 
+
+        # Get absolute experiment number of new recording series:
+        series_start_inds = curr_rows[['Expt_num', 'series_num']].drop_duplicates().index
+        
+        # Assign session index within series for each session:
+        Sess = np.nan*np.ones(len(expt_nums))
+        for s, sstart in enumerate(series_start_inds[:-1]):
+            Sess[series_start_inds[s]:series_start_inds[s+1]] = np.arange(series_start_inds[s+1] - series_start_inds[s])
+        curr_rows['series_sess_num'] = Sess
+        
+        Rs.append(curr_rows)
+
+    df_hat = pd.concat(Rs, axis=0)
+
     # Order by monkey and date:
-    df = df.sort_values(by=['monkey', 'date'])
+    df_hat = df_hat.sort_values(by=['monkey', 'date'])
+
+    # Aplit 'AP, DV' column into separate float-valued columns:
+    df_hat.loc[:, 'AP'] = df_hat.apply(lambda x : split_ap_dv_coords(x['AP, DV'], 0), axis=1)
+    df_hat.loc[:, 'DV'] = df_hat.apply(lambda x : split_ap_dv_coords(x['AP, DV'], 1), axis=1)
     
-    return df
+    return df_hat
     
 
 
@@ -1296,7 +1352,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
     sheet = sheet[~sheet['channel range (IT)'].isna()] # Filter by channel range (IT)
 
     # Format dates to yyyymmdd str:
-    dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search('\d{8}' ,x.date).group(), axis=1)
+    dates_fmt = sheet.apply(lambda x : x.date.strftime('%Y%m%d') if type(x.date)==datetime.datetime else re.search(r'\d{8}' ,x.date).group(), axis=1)
     sheet.loc[:, 'date'] = dates_fmt
 
     # Optionally apply any additional filters:
@@ -1305,7 +1361,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
     
     # Get brain area names:
     area_cols = [x for x in sheet.columns if 'channel range' in x][:-1]
-    area_names = [re.search('\(\w+\)', a).group()[1:-1] for a in area_cols]
+    area_names = [re.search(r'\(\w+\)', a).group()[1:-1] for a in area_cols]
     
     # Initialize overall dataframe:
     chs_df = pd.DataFrame()
@@ -1322,7 +1378,7 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
             tmp = np.array([None]*n_chans)        
     
             # Get channel ranges for current area:
-            ranges = re.findall('\d{1,3}-\d{1,3}', row[area_col]) if type(row[area_col])==str else [] 
+            ranges = re.findall(r'\d{1,3}-\d{1,3}', row[area_col]) if type(row[area_col])==str else [] 
             
             # Iterate over channel ranges:
             for rn in ranges:
@@ -1340,3 +1396,95 @@ def read_recording_coordinate_data_areas(path=os.path.join('/', 'mnt', 'smb', 'l
         chs_df = pd.concat([chs_df, sess_df], axis=0)
         
     return chs_df
+
+
+
+def split_ap_dv_coords(s, idx, delimiter=','):
+    try:
+        parts = s.split(delimiter)
+        part = float(parts[idx])
+    except:
+        part = None
+    return part
+
+
+
+def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
+    """
+    Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
+    """
+
+    # Read CSV:
+    df = pd.read_csv(csv_path)
+
+    coarse_cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
+    coarse_cluster_label_cols = [c for c in coarse_cluster_label_cols if 'filtered' not in c and 'cluster' not in c]
+    coarse_cluster_labels = [x[:-4] for x in coarse_cluster_label_cols]
+    if filtered:
+        cluster_label_cols = [x + '_filtered' for x in cluster_label_cols]
+
+    # Iterate over sessions:
+    dfs = []
+    for r, row in df.iterrows():
+        
+        # Initialize dataframe for current session:
+        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
+
+        if grain == 'fine':
+
+            # Assign cluster labels:
+            curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')    
+            curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+        
+        elif grain == 'coarse':
+
+            # For version of sheet deprecated as of 2026-06-25:
+            # Get cluster IDs for current session:
+            cluster_ids_str = row.cluster_id
+            cluster_ids_cropped = cluster_ids_str[1:-1]
+            cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
+            curr_df['cluster_id'] = cluster_ids
+            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
+
+            # Try to assign cluster labels:
+            curr_df['cluster_label'] = None
+            for c, col in enumerate(coarse_cluster_label_cols):
+                curr_cluster_label = coarse_cluster_labels[c]
+                
+                curr_inds_str = row[col]
+
+                # If no channels of current cluster, move to next cluster:
+                isempty = curr_inds_str is None or\
+                    (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
+                    (type(curr_inds_str) and curr_inds_str[1:-1]=='')
+                if isempty:
+                    continue
+                
+                curr_inds_cropped = curr_inds_str[1:-1]
+                print('curr_inds_cropped = {}'.format(curr_inds_cropped))
+                curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
+                curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
+
+        # Get session metadata:
+        monkey = re.search('[a-zA-Z]{1,}', row.session).group()
+        date = re.search('\d{8}', row.session).group()
+        curr_df['monkey'] = monkey
+        curr_df['date'] = date
+        dfs.append(curr_df)
+
+    # Concatenate cluster labels across sessions:
+    df_out = pd.concat(dfs, axis=0)
+
+    # Try to retrieve some metadata for latest version of CSV file: 
+    csv_meta = dict()
+
+    mtime = os.path.getmtime(csv_path)
+    mtime_datetime = datetime.datetime.fromtimestamp(mtime)
+    date_str = mtime_datetime.strftime('%Y%m%d')
+    time_str = mtime_datetime.strftime('%H:%M:%S')
+
+    csv_meta['path'] = csv_path
+    csv_meta['date'] = date_str
+    csv_meta['time'] = time_str
+
+    return df_out, csv_meta

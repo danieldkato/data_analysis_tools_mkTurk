@@ -4,10 +4,10 @@ from pathlib import Path
 import os
 import sys
 import numpy as np
-from utils_ephys import get_data_bl, get_data_bystim, gen_psth_byscenefile
-from utils_meta import init_dirs, get_chanmap
-from utils_code import Config 
-from make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .utils_ephys import get_data_bl, get_data_bystim, gen_psth_byscenefile
+from .utils_meta import init_dirs, get_chanmap
+from .utils_code import Config 
+from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 
 def analyze_bystim(n_chan: int, monkey: str, date: str):

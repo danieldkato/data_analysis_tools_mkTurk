@@ -1,20 +1,23 @@
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 import glob
 import h5py
+import glob
 import pickle
 import json
 import warnings
 import re
 import numpy as np
 import pandas as pd
+import json
 from itertools import product
-from data_analysis_tools_mkTurk.utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
-from data_analysis_tools_mkTurk.stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
-from data_analysis_tools_mkTurk.npix import get_site_coords, get_sess_metadata_path, extract_imro_table
-from data_analysis_tools_mkTurk.general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df
+from .utils_meta import find_channels, get_recording_path, get_coords_sess, get_all_metadata_sess
+from .stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
+from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords
+from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -103,6 +106,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     
     pen_id = preprocessed_data_path.split(os.path.sep)[-1]
     
+    pen_id = preprocessed_data_path.split(os.path.sep)[-1]
+    
     # Load metadata for current session
     recording_dir = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0].split(os.sep)[-1]
     sess_meta, scenefile_meta, stim_meta = get_all_metadata_sess(preprocessed_data_path)
@@ -135,6 +140,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_params_df['stim_idx'] = trial_params_df['stim_idx'].drop(columns='offset')
     
     # Try to retrieve THREEJS params directly from behavior files:
+    rsvp_dframes_list = []
     behav_df = pd.DataFrame()
     sess_dirs = [x for x in os.listdir(os.path.join(base_data_path, monkey)) if pen_id in x]
     if len(sess_dirs) == 1 and os.path.exists(os.path.join(base_data_path, monkey, sess_dirs[0])):
@@ -164,20 +170,35 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 curr_sfile_df['scenefile'] = sfile
                 curr_sfile_df['behav_file'] = b
                 behav_df = pd.concat([behav_df, curr_sfile_df], axis=0)
+
+            # Find which individual RSVP slots were completed vs. broken fixation during:
+            curr_rsvp_dframe = find_complete_rsvp_slots(bfile)
+            curr_rsvp_dframe['behav_file'] = b 
+            rsvp_dframes_list.append(curr_rsvp_dframe) 
+
+        rsvp_dframes = pd.concat(rsvp_dframes_list, axis=0)
+
+    # Merge general trial parameters with THREEJS params from behavior files:
     trial_params_df = pd.merge(trial_params_df, behav_df, on=['scenefile', 'behav_file', 'stim_idx'], how='left')
-    trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)       
-                
+    trial_params_df['trial_num'] = trial_params_df.trial_num.astype(int)
+
+    # Merge general trial parameters with whether each RSVP slot was completed:
+    trial_params_df = abs2rel_ind(trial_params_df, grouping_col='behav_file', idx_col='trial_num', rename_col=True)
+    trial_params_df = pd.merge(trial_params_df, rsvp_dframes.rename(columns={'trial_num':'trial_num_rel'}), on=['behav_file', 'trial_num_rel', 'rsvp_num', 'stim_idx'])
+
     # Add a few general parameters to trial_params_df:
     # TODO: think about adding following parameters as well:
     # From stim_meta (one value per dict): iti_dur, t_before, t_after 
     # From sess_meta: reward, reward_dur
     trial_params_df['monkey'] = monkey
     trial_params_df['date'] = date
-    trial_params_df['reward_bool'] = sess_meta_df.reward_bool
+    trial_params_df = pd.merge(trial_params_df, sess_meta_df[['trial_num', 'rsvp_num', 'reward_bool', 't_on']], on=['trial_num', 'rsvp_num'])
+    #trial_params_df['reward_bool'] = sess_meta_df.reward_bool
+    #trial_params_df['t_on'] = sess_meta_df.t_on
     
     # Try to get paths to saved images:
     trial_params_df = add_im_full_paths(trial_params_df, base_data_path)
-        
+
     # Copy general timing params to own dict as formal return:
     bin_width = stim_meta[stim_ids[0]]['binwidth'] # < Hack; assuming (probably safely) that same for all stim
     t_before = stim_meta[stim_ids[0]]['t_before'] # < Hack; assuming (probably safely) that same for all stim
@@ -188,7 +209,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     trial_info['t_before'] = t_before
     trial_info['t_after'] = t_after
     #trial_info['trials'] = trial_df
-   
+
     # Create s-by-g matrix specifying which stimulus ids are associated with which 
     # scenefiles, where s is the number of individual stimulus conditions and g
     # is the number of scenefiles sampled in current session; i,j-th element is
@@ -220,7 +241,6 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     n_rsvp = len(trial_params_df.rsvp_num.unique())  
     spike_counts = np.empty((len(channels), max_n_bins, n_trials, n_rsvp)) 
     spike_counts[:] = np.nan
-
     
     # Iterate over channels:
     input_files = []
@@ -252,7 +272,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 # start_idx programmatically. 
                 start_idx = 0
                 spike_counts[cx, start_idx:start_idx+len(curr_data), curr_trial_num, curr_rsvp_num] = curr_data
-     
+
     # Save output if requested: 
     if save_output:
         
@@ -261,7 +281,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             output_directory = os.getcwd()
             
         if not os.path.exists(output_directory):
-            Path.Path(output_directory).mkdir(parents=True, exist_ok=True)
+            Path(output_directory).mkdir(parents=True, exist_ok=True)
             
         output_path = os.path.join(output_directory, fname+'.h5') 
         
@@ -295,7 +315,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             
             #"""
             # Write truncated dataframe of select trial parameters:
-            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file']
+            short_cols = ['monkey', 'date', 'trial_num', 'rsvp_num', 'stim_id', 'stim_idx', 'scenefile', 'behav_file', 'reward_bool', 'stim_completed', 'frac_completed', 't_on']
             if 'img_full_path' in trial_params_df.columns:
                 short_cols.append('img_full_path')
             trial_params_short = trial_params_df[short_cols] 
@@ -326,6 +346,8 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
             M.add_output(output_path)
             M.add_param('chunk_size', chunk_size)
             M.add_param('dtype', str(dtype))
+            M.date = datetime.now().strftime('%Y-%m-%d')
+            M.time = datetime.now().strftime('%H:%M:%S')
             metadata_path = os.path.join(output_directory, 'chpsths_2_h5.json')
             write_metadata(M, metadata_path, get_checksum=False)
             
@@ -723,14 +745,16 @@ def standardize_col_types(df):
     # Iterate over columns with multiple types:
     for col in multitype_cols:
         
-        print(col)
-        
         # Get types in current column:
         curr_types = np.unique([str(type(x)) for x in df[col]])
     
         # Define specific fixes for different combinations of types; this part a bit hack-y:
         if "<class 'float'>" in curr_types and "<class 'str'>" in curr_types:
             
+            # Convert str 'true' to 1:
+
+            df.loc[df[col]=='true', col] = 1
+
             # If all floats are NaN, make everything string:
             floats = np.where([type(x)==float for x in df[col]])[0]
             nans = np.where(df[col].isna())[0]
@@ -838,10 +862,10 @@ def sfile_2_sv_img_dir(sfile_name, base_data_directory=os.path.join('/', 'mnt', 
 def sv_img_dir_2_im_paths(sv_img_dir):
 
     # Select image files:
-    imgs = [x for x in os.listdir(sv_img_dir) if re.search('_index\d+.png', x) is not None]
+    imgs = [x for x in os.listdir(sv_img_dir) if re.search(r'_index\d+.png', x) is not None]
 
     # Extract image indices:
-    img_indices = [int(re.search('_index\d+.png', img).group()[6:][:-4]) for img in imgs] 
+    img_indices = [int(re.search(r'_index\d+.png', img).group()[6:][:-4]) for img in imgs] 
     
     # Create dataframe:
     im_paths_df = pd.DataFrame()
@@ -956,7 +980,7 @@ def find_saved_imgs_dir(trial_params):
         return None
     
     # Try to get stim set number:
-    stim_set_regex = 'neural_stim_\d+_'
+    stim_set_regex = r'neural_stim_\d+_'
     h = lambda x : re.search(stim_set_regex, x)
     stim_sets = [h(x).group()[-2] for x in sfiles if h(x) is not None]
         
@@ -969,7 +993,7 @@ def find_saved_imgs_dir(trial_params):
         return None
         
     # Try to get experiment ID from scenefile ending 'ABCDEFGHIJUVWXYZ_<ID>.json'
-    exp_regex = '[A-Z]{5,}_\d{2,2}.json'
+    exp_regex = r'[A-Z]{5,}_\d{2,2}.json'
     f = lambda x : re.search(exp_regex, x)
     exp_ids = [f(x).group()[-7:-5] for x in sfiles if f(x) is not None]
     
@@ -1022,18 +1046,18 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
     
     ####
 
-    scene_regex = 'neural_stim_\d+'
+    scene_regex = r'neural_stim_\d+'
     if monkey == 'West':
         
         is_scene = re.search(scene_regex, scenefile_name) is not None
         is_natural_images = 'Rust' in scenefile_name and 'NaturalImages' in scenefile_name
         is_faces = 'elias' in scenefile_name or 'neptune' in scenefile_name
-        is_hvm = re.search('hvm\d{2}_\w+_\d{2}_\d{8}', sfile_basename) is not None
+        is_hvm = re.search(r'hvm\d{2}_\w+_\d{2}_\d{8}', sfile_basename) is not None
         
         if is_scene or is_natural_images or is_faces:
         
             # If dealing with scene stimuli:        
-            if is_scene is not None:
+            if is_scene:
                 
                 # Get stim set number:
                 stim_set_str = re.search(scene_regex, scenefile_name).group()
@@ -1052,12 +1076,13 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 # If stim set is greater than or equal to 5, try to additionally get experiment ID:
                 elif stim_set >= 5:
                     
-                    expt_regex = '_\d+[A-Z]{3,}\d*_\w{2,2}'
+                    expt_regex = r'_\d+[A-Z]{3,}\d*_\w{2,2}'
                     expt_search = re.search(expt_regex, scenefile_name)
                     if expt_search is not None:
                         expt_str = expt_search.group()[-2:]
                     else:
-                        raise AssertionError('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        warnings.warn('No experiment ID discovered in scenefile name {}.'.format(scenefile_name))
+                        return None
                     
                     # Define experiment directory:
                     expt_dirname = 'Saved_Images_{}_{}_{}'.format(monkey, stim_set_str, expt_str)
@@ -1074,9 +1099,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                     expt_dirname = matches[0]
                     expt_directory = os.path.join(monkey_dir, expt_dirname)
                 elif len(matches) < 1:
-                    raise AssertionError('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('No directories matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
                 elif len(matches) > 1:
-                    raise AssertionError('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    warnings.warn('More than one directory matching requested scenefile discovered in {}'.format(monkey_dir))
+                    return None
             
                 # Random exception handling:
                 if monkey == 'West':
@@ -1091,9 +1118,11 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
                 if len(face_expt_dirs) == 1:
                     expt_dirname = face_expt_dirs[0]
                 elif len(face_expt_dirs) < 1:
-                    raise AssertionError('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    warnings.warn('No face experiment directory discovered in {}.'.format(monkey_dir))
+                    return None
                 elif len(face_expt_dirs) > 1:
-                    raise AssertionError('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    warnings.warn('More than one face experiment directory discovered in {}.'.format(monkey_dir))    
+                    return None
             
                 expt_directory = os.path.join(monkey_dir, expt_dirname)    
                 
@@ -1142,7 +1171,7 @@ def scenefile_2_img_dir(scenefile_name, monkey=None, local_base=None):
         
         # If dealing with scene stimuli:        
         if re.search(scene_regex, scenefile_name) is not None:
-            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+'$', x) is not None]
+            matches_sfile_basename = [x for x in all_saved_img_dirs if re.search(sfile_basename+r'$', x) is not None]
             if len(matches_sfile_basename) == 1:
                 img_dir = matches_sfile_basename[0]
             elif len(matches_sfile_basename) == 0:
@@ -1185,4 +1214,95 @@ def stim_idx_2_img_path(sfile_img_dir, stim_idx):
         impath =None
     
     return impath
+
+
+
+def find_complete_rsvp_slots(bfile):
+
+    # Get some scene metadata:
+    sample_scenes = bfile['SCENES']['SampleScenes'] 
+    durations = [s['durationMS'][0] if (type(s['durationMS'])==list and len(s['durationMS'])==1) else s['durationMS'] for s in sample_scenes]
+    nstims = [s['nimages'] for s in sample_scenes]
+    try:
+        feedback_pre = bfile['TASK']['FeedbackPRE']
+    except:
+        feedback_pre = 0
+    scene_df = pd.DataFrame(np.array([nstims, durations]).T, columns=['nstim', 'stim_duration'])
+    scene_df['scenefile_idx'] = np.arange(scene_df.shape[0])
+
+    # Get single-trial data:
+    trial_df = pd.DataFrame()
+
+    # Get trial timing data: 
+    start_time = np.array(bfile['TRIALEVENTS']['StartTime'])
+    sample_start_time = np.array(bfile['TRIALEVENTS']['SampleStartTime'])
+    reinforcement_time = np.array(bfile['TRIALEVENTS']['ReinforcementTime'])
+    end_time = np.array(bfile['TRIALEVENTS']['EndTime'])
+    reward = np.array(bfile['TRIALEVENTS']['NReward'])
+    trial_df['start_time'] = start_time
+    trial_df['sample_start_time'] = sample_start_time
+    trial_df['reinforcement_time'] = reinforcement_time
+    trial_df['end_time'] = end_time
+    trial_df['sample_duration'] = trial_df['reinforcement_time'] - trial_df['sample_start_time'] - feedback_pre + 16 # HACK!!! Hard-coding assumed 16-ms (1-frame) quantization effect; West rewarded RSVP trials have nominal duration of ~884 ms instead of expected 900; single frame drop? 
+    trial_df['trial_rewarded'] = reward.astype(bool)
+    trial_df['trial_num'] = np.arange(trial_df.shape[0])
+
+    # Get individual "absolute" stim indices (i.e., index into images pooled across scenefiles):
+    sample_idx_abs = bfile['TRIALEVENTS']['Sample']
+    sample_idx_ar = np.array(list(sample_idx_abs.values()))
+    n_slots = sample_idx_ar.shape[0]
+    stim_cols = ['stim'+str(r) for r in np.arange(n_slots)]
+    for c, col in enumerate(stim_cols):
+        trial_df[col] = sample_idx_ar[c]
+
+    # Get scenefiles of each RSVP slot (should be the same for all slots within a trial):
+    dur_cols = []
+    offsets = np.cumsum(scene_df.nstim) - 1
+    get_sfile_index = lambda x : min(np.where(offsets.values >= x)[0])
+    for c, col in enumerate(stim_cols):
+
+        curr_sfile_colname = 'sfile'+str(c) 
+        curr_dur_colname = 'stim{}_duration'.format(c)
+        dur_cols.append(curr_dur_colname)
+        trial_df[curr_sfile_colname] = list(map(get_sfile_index, trial_df[col].values))
         
+        # Merge stim duration for each slot:        
+        trial_df = pd.merge(trial_df, 
+                            scene_df[['scenefile_idx', 'stim_duration']].rename(columns={'scenefile_idx':curr_sfile_colname}), 
+                            on=curr_sfile_colname)\
+                        .rename(columns={'stim_duration':curr_dur_colname})
+        
+    # Aggregate stimulus durations into single array:
+    trial_df['stim_durs'] = trial_df.apply(lambda x : np.array([0] + [x[col] for col in dur_cols]), axis=1)
+
+    # Verify that all stim within a trial are from the same scenefile:
+    trial_df['n_stim_complete'] = trial_df.apply(lambda x : 
+        max(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0])+1 
+        if len(np.where(x.sample_duration > np.cumsum([x[c] for c in dur_cols]))[0]) > 0 
+        else 0, axis=1)
+
+    # Expand trials to individual slots:
+    T = []
+    for t in np.arange(n_slots):
+        base_cols = [x for x in trial_df.columns if 'stim' not in x and 'sfile' not in x] + ['stim_durs', 'n_stim_complete']
+        curr_df = trial_df.copy()[base_cols + ['stim'+str(t), 'sfile'+str(t)]].rename(columns={'stim'+str(t):'stim_idx', 'sfile'+str(t):'scenefile_idx'})
+        curr_df.insert(curr_df.shape[1], 'rsvp_num', t)
+        curr_df['stim_idx'] = trial_df['stim'+str(t)]
+        T.append(curr_df)
+    rsvp_df = pd.concat(T)
+    rsvp_df = rsvp_df.sort_values(by=['trial_num', 'rsvp_num'])
+
+    # Convert "absolute" stim indices to within-scenefile stim index:
+    offsets_hat = np.array([0] + list(offsets.values+1))
+    rsvp_df['stim_idx'] = rsvp_df.apply(lambda x : x.stim_idx - offsets_hat[x.scenefile_idx], axis=1)
+
+    # Determine whether each stim. presentation was successfully fixated through:
+    fixation_broken = rsvp_df.apply(lambda x : ~x.trial_rewarded and x.rsvp_num > x.n_stim_complete-1, axis=1)
+    rsvp_df['stim_completed'] = ~fixation_broken.values.astype(bool)
+    rsvp_df['frac_completed'] = rsvp_df.apply(lambda x : (x.sample_duration - np.cumsum(x.stim_durs[0:x.n_stim_complete+1])[-1])/x.stim_durs[x.rsvp_num+1] if not x.stim_completed else 1.0, axis=1).values
+
+    # Drop unneeded columns:
+    rsvp_df = rsvp_df[['trial_num', 'rsvp_num', 'scenefile_idx', 'stim_idx', 'stim_completed', 'frac_completed', 'trial_rewarded', 'start_time', 'sample_start_time', 'reinforcement_time', 'end_time']]
+
+    return rsvp_df
+            
