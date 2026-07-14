@@ -27,7 +27,7 @@ except ImportError:
 
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
-    chunk_size=100, dtype=float, save_output=False, fname='all_psth', output_directory=None,
+    chunk_size=100, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
     source='mua'):
     """
     Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
@@ -578,8 +578,8 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
 
     # Hack; input HDF5s are saved as int32 to reduce space, I/O time, but this 
     # has effect of turning nan into -2*10^9; convert back to nan here:
-    slices = slices.astype(float)
-    slices[slices<-2e9] = np.nan 
+    slices = slices.astype(np.float32)
+    #slices[slices<-2e9] = np.nan 
 
     return slices
 
