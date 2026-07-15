@@ -27,7 +27,7 @@ except ImportError:
 
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
-    chunk_size=100, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
+    chunk_size=20, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
     source='mua'):
     """
     Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
@@ -343,7 +343,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         # which fails on network filesystems (SMB/NFS) with an HDF5 file-lock
         # error ("unable to lock the file, errno = 11"). The h5py block therefore
         # closes before any to_hdf() call runs.
-        with h5py.File(output_path, 'w') as f:
+        with h5py.File(output_path, 'w', rdcc_nbytes=80) as f:
             #dset = f.create_dataset('data', data=spike_counts, dtype='int32')
 
             # Define chunk size:
@@ -358,7 +358,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 stim_id_chunks = (chunk_size, stim_indices.shape[1])
 
             # Create dataset containing actual spike counts:
-            dset = f.create_dataset('data', data=spike_counts, dtype=dtype, rdcc_nbytes=8*(10**9)*3, chunks=spike_chunks)
+            dset = f.create_dataset('data', data=spike_counts, dtype=dtype, chunks=spike_chunks)
             #dset.attrs['trial_df'] = trial_df
 
             # Write scenefile-by-stim_id boolean matrix specifying which stim
