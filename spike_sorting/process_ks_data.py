@@ -6,13 +6,13 @@ from pathlib import Path
 
 try:
     from ..analyze_bystim import analyze_bystim_all, kilosort_psth_complete
-    from ..utils_meta import init_dirs
+    from ..utils_meta import init_dirs, resolve_ks_h5_path
     from ..make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
     from ..IO import ch_dicts_2_h5
     from .quality_metrics import run_quality_metrics, save_template_metrics
 except ImportError:
     from data_analysis_tools_mkTurk.analyze_bystim import analyze_bystim_all, kilosort_psth_complete
-    from data_analysis_tools_mkTurk.utils_meta import init_dirs
+    from data_analysis_tools_mkTurk.utils_meta import init_dirs, resolve_ks_h5_path
     from data_analysis_tools_mkTurk.make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
     from data_analysis_tools_mkTurk.IO import ch_dicts_2_h5
     from data_analysis_tools_mkTurk.spike_sorting.quality_metrics import run_quality_metrics, save_template_metrics
@@ -77,13 +77,12 @@ def process_ks_data(monkey: str, date: str, n_jobs: int = -1, force: bool = Fals
     total_start = time.time()
 
     # Resolve session paths (one recording per monkey/date).
-    data_path_list, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
     if len(save_out_path_list) != 1:
         raise ValueError(f"expected exactly one recording for {monkey} {date}, found {len(save_out_path_list)}")
     preprocessed_data_path = str(save_out_path_list[0])
-    recording_dir = Path(preprocessed_data_path).name
 
-    output_directory = os.path.join(output_base, monkey, recording_dir, 'ks')
+    output_directory = str(resolve_ks_h5_path(monkey, date, output_base=output_base).parent)
 
     # Stage 1: Per-unit stimulus-based PSTHs (analyze_bystim, source='kilosort')
     logger.info("Stage 1/3: Starting per-unit by_stim PSTHs...")
