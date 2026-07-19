@@ -1436,7 +1436,7 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
 
         # Initialize dataframe for current session:
         n_units = len([int(x) for x in row.cluster_id[1:-1].split(', ')])
-        curr_df = pd.DataFrame({'neur_unit_idx_colname':np.arange(n_units)})
+        curr_df = pd.DataFrame({neur_unit_idx_colname:np.arange(n_units)})
 
         if grain == 'fine':
 
@@ -1452,7 +1452,7 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
             cluster_ids_cropped = cluster_ids_str[1:-1]
             cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
             curr_df['cluster_id'] = cluster_ids
-            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
+            curr_df[neur_unit_idx_colname] = np.arange(curr_df.shape[0])
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None
