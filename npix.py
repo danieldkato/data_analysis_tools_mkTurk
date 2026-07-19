@@ -1416,8 +1416,10 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
 
     if unit_type == 'mua':
         csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')
+        neur_unit_idx_colname = 'ch_idx_depth'
     elif unit_type == 'ks':
         csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'single_unit_waveform_session_info.csv')
+        neur_unit_idx_colname = 'single_unit_idx'
 
     # Read CSV:
     df = pd.read_csv(csv_path)
@@ -1433,7 +1435,8 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     for r, row in df.iterrows():
 
         # Initialize dataframe for current session:
-        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
+        n_units = len([int(x) for x in row.cluster_id[1:-1].split(', ')])
+        curr_df = pd.DataFrame({'neur_unit_idx_colname':np.arange(n_units)})
 
         if grain == 'fine':
 
