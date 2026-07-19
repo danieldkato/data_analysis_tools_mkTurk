@@ -1409,10 +1409,15 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 
 
 
-def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
+def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
     """
+
+    if unit_type == 'mua':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')
+    elif unit_type == 'ks':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'single_unit_waveform_session_info.csv')
 
     # Read CSV:
     df = pd.read_csv(csv_path)
