@@ -346,6 +346,8 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]
     coords_df['depth'] = depth_adjusted - D
+    if 'unit_type' in imro_tbl.columns:
+        coords_df['unit_type'] = imro_tbl.unit_type.values()
 
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
@@ -1613,10 +1615,17 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 
 
 
-def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
+def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
     """
+
+    if unit_type == 'mua':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')
+        neur_unit_idx_colname = 'ch_idx_depth'
+    elif unit_type == 'ks':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'single_unit_waveform_session_info.csv')
+        neur_unit_idx_colname = 'single_unit_idx'
 
     # Read CSV:
     df = pd.read_csv(csv_path)
@@ -1632,7 +1641,8 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     for r, row in df.iterrows():
 
         # Initialize dataframe for current session:
-        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
+        n_units = len([int(x) for x in row.cluster_id[1:-1].split(', ')])
+        curr_df = pd.DataFrame({neur_unit_idx_colname:np.arange(n_units)})
 
         if grain == 'fine':
 
@@ -1648,7 +1658,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             cluster_ids_cropped = cluster_ids_str[1:-1]
             cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
             curr_df['cluster_id'] = cluster_ids
-            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
+            curr_df[neur_unit_idx_colname] = np.arange(curr_df.shape[0])
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None
