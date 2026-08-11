@@ -251,8 +251,8 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
                 Channel depth from pial surface, in mm. 
     """
     
-    # Initialize dataframe:
-    chs_df = pd.DataFrame()
+    # Initialize list of dataframes:
+    ch_dfs = []
     
     # Convert zero_coords from Series to DataFrame if necessary:
     if type(zero_coords_df) == pd.Series:
@@ -267,9 +267,14 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
         curr_coords_df['monkey'] = zero_coords.monkey
         curr_coords_df['date'] = zero_coords.date
-        chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
-    
-    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
+        ch_dfs.append(curr_coords_df)
+
+    chs_df = pd.concat(ch_dfs, axis=0)
+
+    retain_cols = ['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']
+    if 'unit_type' in chs_df.columns:
+        retain_cols.append('unit_type')
+    chs_df = chs_df[retain_cols]
     chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
@@ -339,6 +344,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
+    retain_cols = ['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']
     coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
     coords_df['bank'] = Banks
@@ -346,11 +352,14 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]
     coords_df['depth'] = depth_adjusted - D
+    if 'unit_type' in imro_tbl.columns:
+        coords_df['unit_type'] = imro_tbl.unit_type.values
+        retain_cols.append('unit_type')
 
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
-    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
+    coords_df = coords_df[retain_cols]
     coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
