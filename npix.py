@@ -281,7 +281,7 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
 
 
 
-def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
+def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
 
