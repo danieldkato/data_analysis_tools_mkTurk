@@ -679,30 +679,29 @@ def h5_2_df(h5_path, trials=None, channels=None, time_window=None, dset_name='da
             n_bins = h5[dset_name].shape[1]
             bin_indices = [0, n_bins]
 
-    # If passed `trials` argument is not already a dataframe, create df of trial info:
-    if type(trials) != pd.core.frame.DataFrame:
-   
-        print('Fetching trial parameters...')
-        tdf_start = time.time()
-        trial_df = h5_2_trial_df(h5_path, params=trial_params)
-        tdf_stop = time.time()
-        print('... done ({} sec).'.format(tdf_stop - tdf_start))
+        # If passed `trials` argument is not already a dataframe, create df of trial info:
+        if type(trials) != pd.core.frame.DataFrame:
     
-        # Furthermore, if `trials` is a non-empty array, select the trials 
-        # specified therein:
-        if trials is not None:
-            trial_df = rsvp_from_df(trial_df, trials)
-            
-    # Otherwise, if `trials` was already a dataframe: 
-    elif type(trials) == pd.core.frame.DataFrame:
-        trial_df = trials
+            print('Fetching trial parameters...')
+            tdf_start = time.time()
+            trial_df = h5_2_trial_df(h5_path, params=trial_params)
+            tdf_stop = time.time()
+            print('... done ({} sec).'.format(tdf_stop - tdf_start))
         
-    # Get indices from appropriate columns:
-    trial_df = trial_df.sort_values(by=['trial_num', 'rsvp_num'])
-    trials = np.array([trial_df['trial_num'], trial_df['rsvp_num']]).T
+            # Furthermore, if `trials` is a non-empty array, select the trials 
+            # specified therein:
+            if trials is not None:
+                trial_df = rsvp_from_df(trial_df, trials)
+                
+        # Otherwise, if `trials` was already a dataframe: 
+        elif type(trials) == pd.core.frame.DataFrame:
+            trial_df = trials
+            
+        # Get indices from appropriate columns:
+        trial_df = trial_df.sort_values(by=['trial_num', 'rsvp_num'])
+        trials = np.array([trial_df['trial_num'], trial_df['rsvp_num']]).T
     
-    # Retrieve requested PSTH data:
-    with h5py.File(h5_path, 'r') as h5:
+        # Retrieve requested PSTH data:
         slices = h5_2_dat_array_rsvp(h5, trials=trials, channels=channels, time_window=bin_indices)
         slices = np.transpose(slices, axes=[2, 0, 1])
         slice_list = list(slices)
