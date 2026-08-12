@@ -547,6 +547,12 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
     # TODO: Don't see any reason not to also filter by channel and time here. 
 
     """
+
+    # `h5` may already be an open h5py.File (existing behavior) or a path.
+    # If it's a path, open it with a chunk cache sized for the new chunking
+    # scheme instead of the 1MB h5py default:
+    if isinstance(h5, (str, Path)):
+        h5 = h5py.File(h5, 'r', rdcc_nbytes=_DEFAULT_RDCC_NBYTES, rdcc_nslots=_DEFAULT_RDCC_NSLOTS)
     
     # Define default trial, channel, and time bin ranges if any are set to None:
     if trials is None:
