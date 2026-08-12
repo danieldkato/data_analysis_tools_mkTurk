@@ -10,7 +10,7 @@ from numpy.matlib import repmat
 import openpyxl
 import datetime
 import warnings
-from .utils_meta import get_recording_path
+from .utils_meta import get_recording_path, resolve_ks_dir, resolve_ks_h5_path
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
     refID=0, ap_gain=500, lf_gain=250, ap_highpass=True, output_directory=None):
@@ -251,8 +251,8 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
                 Channel depth from pial surface, in mm. 
     """
     
-    # Initialize dataframe:
-    chs_df = pd.DataFrame()
+    # Initialize list of dataframes:
+    ch_dfs = []
     
     # Convert zero_coords from Series to DataFrame if necessary:
     if type(zero_coords_df) == pd.Series:
@@ -267,16 +267,21 @@ def chs_meta_2_site_coords(zero_coords_df, imro_df, spacing=15, tip_length=175):
         curr_coords_df = get_site_coords(zero_coords, curr_imro_tbl, spacing=spacing, tip_length=tip_length)
         curr_coords_df['monkey'] = zero_coords.monkey
         curr_coords_df['date'] = zero_coords.date
-        chs_df = pd.concat([chs_df, curr_coords_df], axis=0)
-    
-    chs_df = chs_df[['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
+        ch_dfs.append(curr_coords_df)
+
+    chs_df = pd.concat(ch_dfs, axis=0)
+
+    retain_cols = ['monkey', 'date', 'ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']
+    if 'unit_type' in chs_df.columns:
+        retain_cols.append('unit_type')
+    chs_df = chs_df[retain_cols]
     chs_df.index = np.arange(chs_df.shape[0])
     
     return chs_df 
 
 
 
-def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
+def get_site_coords(zero_coords, imro_tbl, spacing=15, tip_length=175):
     """
     Compute coordinates of neuropixels probe recording site. 
 
@@ -339,6 +344,7 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     Coords = F - np.multiply(D, B)
     
     # Save as pandas dataframe:
+    retain_cols = ['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']
     coords_df = pd.DataFrame(columns=['ch_idx_glx', 'bank', 'ap', 'ml', 'dv', 'depth'], index=Chs)
     coords_df['ch_idx_glx'] = Chs
     coords_df['bank'] = Banks
@@ -346,11 +352,14 @@ def get_site_coords(zero_coords, imro_tbl, spacing=20, tip_length=175):
     coords_df['ml'] = Coords[:,1]
     coords_df['dv'] = Coords[:,2]
     coords_df['depth'] = depth_adjusted - D
+    if 'unit_type' in imro_tbl.columns:
+        coords_df['unit_type'] = imro_tbl.unit_type.values
+        retain_cols.append('unit_type')
 
     # Add channel index by depth:
     coords_df = coords_df.sort_values(by=['depth'], ascending=[False])
     coords_df['ch_idx_depth'] = np.arange(coords_df.shape[0])
-    coords_df = coords_df[['ch_idx_glx', 'ch_idx_depth', 'bank', 'ap', 'dv', 'ml', 'depth']]
+    coords_df = coords_df[retain_cols]
     coords_df.index = np.arange(coords_df.shape[0])
     
     return coords_df
@@ -1186,6 +1195,210 @@ def read_area_label_sheets(labeled_brain_areas_path = os.path.join('/', 'mnt', '
 
 
 
+def map_ks_chans_to_depth_idx(h5path, chan_y, tol=1.0):
+    """
+    Map Kilosort channel indices to depth indices (ch_idx_depth).
+
+    The Kilosort channel axis (the channel dimension of templates.npy,
+    temp_chan_amps.npy, channel_positions.npy) is neither SpikeGLX order
+    (ch_idx_glx) nor depth order (ch_idx_depth): on 2-bank probes it interleaves
+    the banks, and the site table's bank assignment disagrees with Kilosort's
+    over the upper half of the probe. Only a channel's physical y-coordinate
+    locates it reliably, so this matches Kilosort channels to recording sites by
+    y rather than by any channel id.
+
+
+    Parameters
+    ----------
+    h5path : str
+        Path to session HDF5, used to read the probe geometry (zero_coordinates
+        and imro_table; see h5_2_ch_meta()).
+
+    chan_y : numpy.ndarray
+        Vector of Kilosort channel y-coordinates in um, increasing from the
+        probe tip, i.e. column 1 of Kilosort's channel_positions.npy.
+
+    tol : float, optional
+        Maximum |y| discrepancy in um for a Kilosort channel to match a
+        recording site. The default is 1.0.
+
+
+    Returns
+    -------
+    ks_to_depth : numpy.ndarray
+        Vector of depth indices (ch_idx_depth), one per Kilosort channel, such
+        that ks_to_depth[i] is the depth index of Kilosort channel i.
+
+    """
+
+    zero_coords, imro_tbl = h5_2_ch_meta(h5path)
+    site_depth = get_site_coords(zero_coords, imro_tbl).sort_values('ch_idx_depth')['depth'].to_numpy()
+
+    # site_depth[0] is the deepest site (ch_idx_depth sorts depth descending), so
+    # measuring from it gives distance from the tip in um, matching Kilosort's
+    # ycoords and cancelling the insertion depth and tip length.
+    site_y = (site_depth[0] - site_depth) * 1000.0
+
+    # Claim sites one-for-one: both columns of a column pair share a single y, so
+    # without this two channels at the same depth collapse onto the same site.
+    ks_to_depth = np.empty(len(chan_y), dtype=int)
+    used = np.zeros(len(site_y), dtype=bool)
+    for i, y in enumerate(chan_y):
+        cand = np.flatnonzero((np.abs(site_y - y) <= tol) & ~used)
+        if cand.size == 0:
+            raise ValueError('Kilosort channel {} (y={:.0f} um) has no free matching recording site.'.format(i, y))
+        ks_to_depth[i] = cand[0]
+        used[cand[0]] = True
+
+    return ks_to_depth
+
+
+
+def read_unit_area_labels(monkey, date,
+        labeled_brain_areas_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'labeled brain areas.xlsx'),
+        recording_coords_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'),
+        exclude_oob=True, exclude_multilabels=False, tree=None, flt=None):
+    """
+    Map Kilosort single units to brain areas.
+
+    Single-unit analogue of read_area_label_sheets(), intended as a drop-in
+    replacement at the same call site: it returns area labels keyed on 'unit_id'
+    rather than 'ch_idx_depth', so the result can be merged directly into any
+    dataframe already broken out by unit. E.g.,:
+
+        unit_labels, src_paths = read_unit_area_labels('Bourgeois', '20250515')
+        dprimes_u = pd.merge(dprimes_u, unit_labels, on=['monkey', 'date', 'unit_id'])
+        dprimes_u = dprimes_u[dprimes_u.apply(lambda x : len(set(areas).intersection(set(x.areas))) > 0, axis=1)]
+
+    As with read_area_label_sheets(), each unit maps to a *list* of areas, since
+    the underlying channels may be labeled as more than one area in the
+    spreadsheets. Ambiguously-labeled units are left in place for the caller to
+    handle downstream (e.g. simply exclude them); see exclude_multilabels/tree to
+    resolve them here instead.
+
+    Each unit is assigned to the channel on which its template is largest (its
+    peak channel), and inherits that channel's area labels. Kilosort also
+    localizes units to a continuous, amplitude-weighted depth (template_depths),
+    but that falls between recording sites and is not used here: the peak channel
+    maps to a site exactly, so no interpolation or nearest-site rounding is
+    needed. See map_ks_chans_to_depth_idx() for the channel mapping, which is
+    keyed on physical y rather than channel id.
+
+
+    Parameters
+    ----------
+    monkey : str
+        Monkey name.
+
+    date : str
+        Recording date (YYYYMMDD).
+
+    labeled_brain_areas_path : str, optional
+        Path to 'labeled brain areas' spreadsheet. Passed through to
+        read_area_label_sheets().
+
+    recording_coords_path : str, optional
+        Path to 'recording coordinate data' spreadsheet. Passed through to
+        read_area_label_sheets().
+
+    exclude_oob : bool, optional
+        Whether to exclude out-of-brain channels. Passed through to
+        read_area_label_sheets(). Note this drops the affected channels from the
+        area table, so units on them are dropped from the output too (a warning
+        reports how many). The default is True.
+
+    exclude_multilabels : bool, optional
+        Whether to exclude channels associated with more than one brain area,
+        and hence the units on them. Passed through to read_area_label_sheets().
+        The default is False.
+
+    tree : dict, optional
+        Dictionary specifying hierarchical organization of brain areas. Passed
+        through to read_area_label_sheets(); see exclude_multiarea_chs(). The
+        default is None.
+
+    flt : function, optional
+        Miscellaneous filter applied when reading the area spreadsheets. Passed
+        through to read_area_label_sheets(). The default is None.
+
+
+    Returns
+    -------
+    units_df : pandas.core.frame.DataFrame
+        Dataframe mapping units to brain areas. Defines the following columns:
+
+            monkey : str
+                Monkey name.
+
+            date : str
+                Recording date (YYYYMMDD).
+
+            unit_id : int
+                Kilosort template/cluster id. Row-aligned with the per-unit
+                metrics tables returned by
+                spike_sorting.quality_metrics.load_unit_info_dfs().
+
+            ch_idx_depth : int
+                Depth index of the unit's peak channel. Retained so the
+                unit-to-channel mapping is auditable.
+
+            areas : list
+                List of brain areas associated with unit.
+
+    ref_paths : list
+        List of paths to source spreadsheets.
+
+    """
+
+    # read_area_label_sheets() returns a bare dataframe rather than its usual
+    # (dataframe, ref_paths) tuple when no channels match, so unpack defensively:
+    out = read_area_label_sheets(labeled_brain_areas_path=labeled_brain_areas_path,
+        recording_coords_path=recording_coords_path, exclude_oob=exclude_oob,
+        exclude_multilabels=exclude_multilabels, tree=tree, flt=flt)
+    if isinstance(out, tuple):
+        chs_df, ref_paths = out
+    else:
+        chs_df = out
+        ref_paths = [labeled_brain_areas_path, recording_coords_path]
+
+    # Restrict to requested session:
+    if chs_df.shape[0] > 0:
+        chs_df = chs_df[(chs_df.monkey==monkey) & (chs_df.date==date)]
+    if chs_df.shape[0] == 0:
+        warnings.warn('No area labels found for session {}, {}; returning empty dataframe.'.format(monkey, date))
+        return pd.DataFrame(columns=['monkey', 'date', 'unit_id', 'ch_idx_depth', 'areas']), ref_paths
+
+    h5path = resolve_ks_h5_path(monkey, date)
+    ks_dir = resolve_ks_dir(monkey, date)
+
+    templates = np.load(ks_dir / 'templates.npy') # (n_templates, n_time, n_chan)
+    channel_positions = np.load(ks_dir / 'channel_positions.npy') # (n_chan, 2), (x,y) in um
+    chan_y = channel_positions[:,1]
+
+    # Each unit's peak channel, as an index into the Kilosort channel axis:
+    peak_ks = np.argmax(np.ptp(templates, axis=1), axis=1) # (n_templates,)
+
+    ks_to_depth = map_ks_chans_to_depth_idx(h5path, chan_y)
+    peak_ch_idx_depth = ks_to_depth[peak_ks]
+
+    units_df = pd.DataFrame({'monkey':monkey, 'date':date,
+        'unit_id':np.arange(templates.shape[0]), 'ch_idx_depth':peak_ch_idx_depth})
+
+    # Merge in area labels of each unit's peak channel:
+    n_units = units_df.shape[0]
+    units_df = pd.merge(units_df, chs_df[['monkey', 'date', 'ch_idx_depth', 'areas']],
+        on=['monkey', 'date', 'ch_idx_depth'], how='inner')
+
+    # Units on channels that exclude_oob/exclude_multilabels dropped from the
+    # area table are dropped here too, silently, so report the count:
+    n_dropped = n_units - units_df.shape[0]
+    if n_dropped > 0:
+        warnings.warn('Dropped {} of {} units in session {}, {} whose peak channel has no area label.'.format(n_dropped, n_units, monkey, date))
+
+    return units_df, ref_paths
+
+
+
 def read_labeled_brain_areas_sheet(path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'labeled brain areas.xlsx'), flt=None):
     """
     Read 'labeled brain areas'  spreadsheet, which includes AG's area labels for 
@@ -1409,10 +1622,17 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 
 
 
-def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv'), grain='fine', filtered=False):
+def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
     """
+
+    if unit_type == 'mua':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'waveform_session_info.csv')
+        neur_unit_idx_colname = 'ch_idx_depth'
+    elif unit_type == 'ks':
+        csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'single_unit_waveform_session_info.csv')
+        neur_unit_idx_colname = 'single_unit_idx'
 
     # Read CSV:
     df = pd.read_csv(csv_path)
@@ -1428,7 +1648,8 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
     for r, row in df.iterrows():
 
         # Initialize dataframe for current session:
-        curr_df = pd.DataFrame({'ch_idx_depth':np.arange(384)})
+        n_units = len([int(x) for x in row.cluster_id[1:-1].split(', ')])
+        curr_df = pd.DataFrame({neur_unit_idx_colname:np.arange(n_units)})
 
         if grain == 'fine':
 
@@ -1444,7 +1665,7 @@ def read_cluster_labels(csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa
             cluster_ids_cropped = cluster_ids_str[1:-1]
             cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
             curr_df['cluster_id'] = cluster_ids
-            curr_df['ch_idx_depth'] = np.arange(curr_df.shape[0])
+            curr_df[neur_unit_idx_colname] = np.arange(curr_df.shape[0])
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None

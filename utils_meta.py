@@ -249,6 +249,72 @@ def init_dirs(base_data_path, monkey, date, base_save_out_path):
     return data_path, save_out_path, plot_save_out_path
 
 
+def resolve_ks_dir(monkey, date):
+    """
+    Resolve the raw Kilosort4 output directory for a session.
+
+    This is the directory Kilosort itself wrote (templates.npy,
+    channel_positions.npy, spike_times.npy, the cluster_*.tsv files), under the
+    Data root -- NOT the save-out kilosort4 dir holding the derived per-unit
+    metrics. For the latter, see spike_sorting.quality_metrics.
+
+    Args:
+        monkey (str): Monkey identifier.
+        date (str): Recording date (YYYYMMDD).
+
+    Returns:
+        pathlib.Path: Path to the session's raw kilosort4 directory.
+
+    Raises:
+        ValueError: If the monkey/date does not resolve to exactly one recording.
+    """
+    from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+    from .spike_sorting.staging import find_recording_dir
+
+    data_path_list, _, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    if len(data_path_list) != 1:
+        raise ValueError('Multiple or no recordings found for {}, {}'.format(monkey, date))
+
+    return find_recording_dir(Path(data_path_list[0])) / 'kilosort4'
+
+
+def resolve_ks_h5_path(monkey, date, output_base=None):
+    """
+    Resolve the single-unit session HDF5 path for a session.
+
+    Same resolution as spike_sorting.process_ks_data(), which is what writes this
+    file. This is the Kilosort (single-unit) HDF5; the MUA session HDF5 lives
+    elsewhere and is not resolved here.
+
+    Args:
+        monkey (str): Monkey identifier.
+        date (str): Recording date (YYYYMMDD).
+        output_base (str, optional): Root directory of the single-unit session
+            HDF5s. Defaults to <ENGRAM_PATH>/processed_h5, matching
+            process_ks_data()'s DEFAULT_OUTPUT_BASE.
+
+    Returns:
+        pathlib.Path: Path to the session's single-unit HDF5.
+
+    Raises:
+        ValueError: If the monkey/date does not resolve to exactly one recording.
+    """
+    from .make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+
+    if output_base is None:
+        output_base = ENGRAM_PATH / 'processed_h5'
+
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    if len(save_out_path_list) != 1:
+        raise ValueError('Multiple or no recordings found for {}, {}'.format(monkey, date))
+
+    # The HDF5 is filed under the save-out recording dir name, not the raw data
+    # one; see process_ks_data(), which writes it.
+    recording_dir = Path(str(save_out_path_list[0])).name
+
+    return Path(output_base, monkey, recording_dir, 'ks', date + '.h5')
+
+
 def find_channels(directory, prefix=None):
     """
     Find channels for which input directory contains preprocessed data. Assumes 

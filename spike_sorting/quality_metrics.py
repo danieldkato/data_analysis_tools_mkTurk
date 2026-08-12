@@ -20,9 +20,8 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter1d
 
-from ..utils_meta import init_dirs
+from ..utils_meta import init_dirs, resolve_ks_dir
 from ..make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
-from .staging import find_recording_dir
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,11 +205,10 @@ def _resolve_paths(monkey: str, date: str) -> tuple[Path, Path]:
     read from the engram run folder; metrics are written to the save-out side
     (alongside KSLabel.npy), matching Kilosort.ipynb's kilosort_path.
     """
-    data_path_list, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
-    if len(data_path_list) != 1:
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    if len(save_out_path_list) != 1:
         raise ValueError('Multiple or no data paths found for given monkey and date')
-    engram_rec_dir = find_recording_dir(Path(data_path_list[0]))
-    return engram_rec_dir / 'kilosort4', Path(save_out_path_list[0]) / 'kilosort4'
+    return resolve_ks_dir(monkey, date), Path(save_out_path_list[0]) / 'kilosort4'
 
 
 def run_quality_metrics(monkey: str, date: str, overwrite: bool = False) -> None:
