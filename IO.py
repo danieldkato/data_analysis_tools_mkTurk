@@ -25,6 +25,12 @@ except ImportError:
     warnings.warn('Failed to import analysis_metadata module.')
 
 
+# Suggested shared default — size to comfortably hold several chunks
+# at the new (smaller) chunk size, not the old 24GB figure that assumed
+# gigantic chunks:
+_DEFAULT_RDCC_NBYTES = 512 * (2**20)   # 512 MB
+_DEFAULT_RDCC_NSLOTS = 1_000_003       # prime, per h5py's recommendation (~100x number of chunks you expect to cache)
+
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
     chunk_size=20, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
