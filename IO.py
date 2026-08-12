@@ -343,7 +343,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         # which fails on network filesystems (SMB/NFS) with an HDF5 file-lock
         # error ("unable to lock the file, errno = 11"). The h5py block therefore
         # closes before any to_hdf() call runs.
-        with h5py.File(output_path, 'w', rdcc_nbytes=80) as f:
+        with h5py.File(output_path, 'w') as f:
             #dset = f.create_dataset('data', data=spike_counts, dtype='int32')
 
             # Define chunk size:
