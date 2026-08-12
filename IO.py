@@ -662,7 +662,7 @@ def h5_2_df(h5_path, trials=None, channels=None, time_window=None, dset_name='da
     """
     
     # Get some channel and timing metadata:
-    with h5py.File(h5_path, 'r') as h5:
+    with h5py.File(h5_path, 'r', rdcc_nbytes=_DEFAULT_RDCC_NBYTES, rdcc_nslots=_DEFAULT_RDCC_NSLOTS) as h5:
         
         # Asisgn default channel range if necessary:
         if channels is None:
