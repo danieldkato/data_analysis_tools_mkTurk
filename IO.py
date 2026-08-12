@@ -357,6 +357,16 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 spike_chunks = (spike_counts.shape[0], spike_counts.shape[1], chunk_size, spike_counts.shape[3])
                 stim_id_chunks = (chunk_size, stim_indices.shape[1])
 
+            # Sanity-check chunk size before writing — warn if a single chunk is
+            # going to be large enough to make the read-side cache moot:
+            if spike_chunks not in (True, None):
+                chunk_bytes = np.prod(spike_chunks) * np.dtype(dtype).itemsize
+                if chunk_bytes > 64 * (2**20):  # 64 MB, adjust to taste
+                    warnings.warn(
+                        'HDF5 chunk size is {:.1f} MB (chunks={}). Consider a smaller '
+                        '`chunk_size` for more efficient partial reads.'.format(
+                            chunk_bytes / 2**20, spike_chunks))
+
             # Create dataset containing actual spike counts:
             dset = f.create_dataset('data', data=spike_counts, dtype=dtype, chunks=spike_chunks)
             #dset.attrs['trial_df'] = trial_df
