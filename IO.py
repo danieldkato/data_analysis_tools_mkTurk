@@ -373,7 +373,7 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
 
             # Write scenefile-by-stim_id boolean matrix specifying which stim
             # came from which scenefiles:
-            scenefile_lookup = f.create_dataset('stim_indices', data=stim_indices, dtype=dtype, chunks=stim_id_chunks)
+            scenefile_lookup = f.create_dataset('stim_indices', data=stim_indices, dtype=dtype, chunks=stim_id_chunks, compression='lzf')
 
             # Write metadata for session:
             f.attrs['psth_bins'] = psth_bins
