@@ -1652,7 +1652,7 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
         neur_unit_idx_colname = 'ch_idx_depth'
     elif unit_type == 'ks':
         csv_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Jared', 'waveforms_data', 'single_unit_waveform_session_info.csv')
-        neur_unit_idx_colname = 'single_unit_idx'
+        neur_unit_idx_colname = 'unit_idx'
 
     # Read CSV:
     df = pd.read_csv(csv_path)
