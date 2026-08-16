@@ -1257,7 +1257,7 @@ def map_ks_chans_to_depth_idx(h5path, chan_y, tol=1.0):
 def read_unit_area_labels(monkey, date,
         labeled_brain_areas_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'labeled brain areas.xlsx'),
         recording_coords_path=os.path.join('/', 'mnt', 'smb', 'locker', 'issa-locker', 'users', 'Dan', 'code', 'data_analysis_tools_mkTurk', 'recording coordinate data.xlsx'),
-        exclude_oob=True, exclude_multilabels=False, tree=None, flt=None):
+        exclude_oob=True, exclude_multilabels=False, tree=None, flt=None, chs_df=None):
     """
     Map Kilosort single units to brain areas.
 
@@ -1266,7 +1266,7 @@ def read_unit_area_labels(monkey, date,
     rather than 'ch_idx_depth', so the result can be merged directly into any
     dataframe already broken out by unit. E.g.,:
 
-        unit_labels, src_paths = read_unit_area_labels('Bourgeois', '20250515')
+        unit_labels, src_paths, chs_df = read_unit_area_labels('Bourgeois', '20250515')
         dprimes_u = pd.merge(dprimes_u, unit_labels, on=['monkey', 'date', 'unit_id'])
         dprimes_u = dprimes_u[dprimes_u.apply(lambda x : len(set(areas).intersection(set(x.areas))) > 0, axis=1)]
 
@@ -1321,6 +1321,15 @@ def read_unit_area_labels(monkey, date,
         Miscellaneous filter applied when reading the area spreadsheets. Passed
         through to read_area_label_sheets(). The default is None.
 
+    chs_df : pandas.core.frame.DataFrame, optional
+        Pre-loaded channel-to-area mapping, across all sessions, as returned by
+        this function or by read_area_label_sheets(). If not None, this is used
+        directly and the (time-consuming) call to read_area_label_sheets() is
+        skipped; labeled_brain_areas_path, recording_coords_path, exclude_oob,
+        exclude_multilabels, tree, and flt are then ignored. Pass the `chs_df`
+        returned by a previous call here to avoid re-loading the area label
+        sheets on repeated calls. The default is None.
+
 
     Returns
     -------
@@ -1346,27 +1355,38 @@ def read_unit_area_labels(monkey, date,
                 List of brain areas associated with unit.
 
     ref_paths : list
-        List of paths to source spreadsheets.
+        List of paths to source spreadsheets. Empty if `chs_df` was passed in.
+
+    chs_df : pandas.core.frame.DataFrame
+        Channel-to-area mapping, across all sessions, as loaded (or passed in).
+        Pass this back in as the `chs_df` parameter on subsequent calls to reuse
+        it instead of re-loading the area label sheets.
 
     """
 
-    # read_area_label_sheets() returns a bare dataframe rather than its usual
-    # (dataframe, ref_paths) tuple when no channels match, so unpack defensively:
-    out = read_area_label_sheets(labeled_brain_areas_path=labeled_brain_areas_path,
-        recording_coords_path=recording_coords_path, exclude_oob=exclude_oob,
-        exclude_multilabels=exclude_multilabels, tree=tree, flt=flt)
-    if isinstance(out, tuple):
-        chs_df, ref_paths = out
+    if chs_df is None:
+
+        # read_area_label_sheets() returns a bare dataframe rather than its usual
+        # (dataframe, ref_paths) tuple when no channels match, so unpack defensively:
+        out = read_area_label_sheets(labeled_brain_areas_path=labeled_brain_areas_path,
+            recording_coords_path=recording_coords_path, exclude_oob=exclude_oob,
+            exclude_multilabels=exclude_multilabels, tree=tree, flt=flt)
+        if isinstance(out, tuple):
+            chs_df, ref_paths = out
+        else:
+            chs_df = out
+            ref_paths = [labeled_brain_areas_path, recording_coords_path]
     else:
-        chs_df = out
-        ref_paths = [labeled_brain_areas_path, recording_coords_path]
+        ref_paths = []
 
     # Restrict to requested session:
     if chs_df.shape[0] > 0:
-        chs_df = chs_df[(chs_df.monkey==monkey) & (chs_df.date==date)]
-    if chs_df.shape[0] == 0:
+        chs_df_sess = chs_df[(chs_df.monkey==monkey) & (chs_df.date==date)]
+    else:
+        chs_df_sess = chs_df
+    if chs_df_sess.shape[0] == 0:
         warnings.warn('No area labels found for session {}, {}; returning empty dataframe.'.format(monkey, date))
-        return pd.DataFrame(columns=['monkey', 'date', 'unit_id', 'ch_idx_depth', 'areas']), ref_paths
+        return pd.DataFrame(columns=['monkey', 'date', 'unit_id', 'ch_idx_depth', 'areas']), ref_paths, chs_df
 
     h5path = resolve_ks_h5_path(monkey, date)
     ks_dir = resolve_ks_dir(monkey, date)
@@ -1386,7 +1406,7 @@ def read_unit_area_labels(monkey, date,
 
     # Merge in area labels of each unit's peak channel:
     n_units = units_df.shape[0]
-    units_df = pd.merge(units_df, chs_df[['monkey', 'date', 'ch_idx_depth', 'areas']],
+    units_df = pd.merge(units_df, chs_df_sess[['monkey', 'date', 'ch_idx_depth', 'areas']],
         on=['monkey', 'date', 'ch_idx_depth'], how='inner')
 
     # Units on channels that exclude_oob/exclude_multilabels dropped from the
@@ -1395,7 +1415,7 @@ def read_unit_area_labels(monkey, date,
     if n_dropped > 0:
         warnings.warn('Dropped {} of {} units in session {}, {} whose peak channel has no area label.'.format(n_dropped, n_units, monkey, date))
 
-    return units_df, ref_paths
+    return units_df, ref_paths, chs_df
 
 
 
