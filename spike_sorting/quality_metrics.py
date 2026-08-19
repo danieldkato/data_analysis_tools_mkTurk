@@ -2,9 +2,14 @@
 
 Computes and saves three arrays (one entry per template/cluster index) to the
 session's save-out kilosort4/ folder:
-    - presence_ratios.npy  : fraction of the recording the unit fires in (0-1)
-    - amplitude_cutoffs.npy : estimated fraction of spikes missing below threshold (0-0.5)
-    - viol_rates.npy       : ISI-violation false-positive rate (0 = clean, >1 = contaminated)
+    - presence_ratios_J.npy   : fraction of the recording the unit fires in (0-1)
+    - amplitude_cutoffs_J.npy : estimated fraction of spikes missing below threshold (0-0.5)
+    - viol_rates_J.npy        : ISI-violation false-positive rate (0 = clean, >1 = contaminated)
+
+All three carry a '_J' suffix. Another pipeline writes unsuffixed copies of these names with
+isi_threshold/min_isi swapped, which zeroes every violation rate and silently disables the
+VIOL_RATE_MAX criterion; the suffix keeps the two sets from colliding. presence_ratios is
+suffixed alongside them so this function's outputs stay in one namespace.
 
 A "good single unit" is typically selected by combining these (e.g. high presence
 ratio, low amplitude cutoff, low ISI violations) together with KSLabel == 'good'.
@@ -212,7 +217,7 @@ def _resolve_paths(monkey: str, date: str) -> tuple[Path, Path]:
 
 
 def run_quality_metrics(monkey: str, date: str, overwrite: bool = False) -> None:
-    """Compute and save presence_ratios / amplitude_cutoffs / viol_rates for a session.
+    """Compute and save presence_ratios_J / amplitude_cutoffs_J / viol_rates_J for a session.
 
     Reads the raw KS4 output (spike_times, spike_clusters, templates, amplitudes,
     whitening_mat_inv) and writes the three .npy arrays into the save-out kilosort4/
@@ -222,7 +227,7 @@ def run_quality_metrics(monkey: str, date: str, overwrite: bool = False) -> None
     if not ks_data_dir.exists():
         raise FileNotFoundError(f"no raw kilosort4 output at {ks_data_dir}; run run_kilosort first")
 
-    targets = ['presence_ratios.npy', 'amplitude_cutoffs.npy', 'viol_rates.npy']
+    targets = ['presence_ratios_J.npy', 'amplitude_cutoffs_J.npy', 'viol_rates_J.npy']
     if not overwrite and all((ks_out_dir / t).exists() for t in targets):
         logger.info(f"quality metrics already present in {ks_out_dir}, skipping (overwrite=False)")
         return
@@ -251,10 +256,10 @@ def run_quality_metrics(monkey: str, date: str, overwrite: bool = False) -> None
     )
 
     ks_out_dir.mkdir(parents=True, exist_ok=True)
-    np.save(ks_out_dir / 'presence_ratios.npy', presence_ratios)
-    np.save(ks_out_dir / 'amplitude_cutoffs.npy', amplitude_cutoffs)
-    np.save(ks_out_dir / 'viol_rates.npy', viol_rates)
-    logger.info(f"wrote presence_ratios / amplitude_cutoffs / viol_rates to {ks_out_dir}")
+    np.save(ks_out_dir / 'presence_ratios_J.npy', presence_ratios)
+    np.save(ks_out_dir / 'amplitude_cutoffs_J.npy', amplitude_cutoffs)
+    np.save(ks_out_dir / 'viol_rates_J.npy', viol_rates)
+    logger.info(f"wrote presence_ratios_J / amplitude_cutoffs_J / viol_rates_J to {ks_out_dir}")
 
 
 def save_template_metrics(monkey: str, date: str, overwrite: bool = False) -> None:
@@ -379,15 +384,15 @@ def load_good_unit_mask(monkey: str, date: str, strict: bool = True,
                         require_single_unit: bool = True) -> np.ndarray:
     """Load a session's saved metrics and return the is_good_unit boolean mask.
 
-    Convenience wrapper: reads presence_ratios / amplitude_cutoffs / viol_rates / fr /
+    Convenience wrapper: reads presence_ratios_J / amplitude_cutoffs_J / viol_rates_J / fr /
     contamPct from the save-out kilosort4/ folder, derives KSLabel from the raw KS4
     output, and applies is_good_unit. Run run_quality_metrics and save_template_metrics
     first.
     """
     ks_data_dir, ks_out_dir = _resolve_paths(monkey, date)
-    presence_ratios = np.load(ks_out_dir / 'presence_ratios.npy')
-    amplitude_cutoffs = np.load(ks_out_dir / 'amplitude_cutoffs.npy')
-    viol_rates = np.load(ks_out_dir / 'viol_rates.npy')
+    presence_ratios = np.load(ks_out_dir / 'presence_ratios_J.npy')
+    amplitude_cutoffs = np.load(ks_out_dir / 'amplitude_cutoffs_J.npy')
+    viol_rates = np.load(ks_out_dir / 'viol_rates_J.npy')
     fr = np.load(ks_out_dir / 'fr.npy')
     contam_pct = np.load(ks_out_dir / 'contamPct.npy')
     n_templates = len(viol_rates)
@@ -405,11 +410,11 @@ def load_good_unit_mask(monkey: str, date: str, strict: bool = True,
 # Quality: exactly the inputs to is_good_unit (plus KSLabel, added separately),
 # so the unit_quality table alone reproduces every good-unit threshold set.
 _UNIT_QUALITY_FILES = {
-    'viol_rates': 'viol_rates.npy',
+    'viol_rates': 'viol_rates_J.npy',
     'fr': 'fr.npy',
-    'presence_ratios': 'presence_ratios.npy',
+    'presence_ratios': 'presence_ratios_J.npy',
     'contamPct': 'contamPct.npy',
-    'amplitude_cutoffs': 'amplitude_cutoffs.npy',
+    'amplitude_cutoffs': 'amplitude_cutoffs_J.npy',
 }
 # Spatial / probe: where the unit sits on the probe and its amplitude.
 _UNIT_SPATIAL_FILES = {
