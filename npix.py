@@ -1657,31 +1657,39 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     # Read CSV:
     df = pd.read_csv(csv_path)
 
-    coarse_cluster_label_cols = list(set(df.columns).difference(set(['session', 'cluster_id', 'config_hash'])))
-    coarse_cluster_label_cols = [c for c in coarse_cluster_label_cols if 'filtered' not in c and 'cluster' not in c]
-    coarse_cluster_labels = [x[:-4] for x in coarse_cluster_label_cols]
-    if filtered:
-        cluster_label_cols = [x + '_filtered' for x in cluster_label_cols]
+    # The base columns (e.g. 'cluster_id', 'exc_ind') hold the filtered classification;
+    # unfiltered counterparts are suffixed with '_unfiltered' (inserted before a trailing
+    # '_ind', e.g. 'exc_unfiltered_ind', but appended after 'cluster_id' -> 'cluster_id_unfiltered').
+    label_cols = [c for c in df.columns if c.endswith('_ind') and 'filtered' not in c and 'cluster' not in c]
+    if grain == 'coarse':
+        label_cols = [c for c in label_cols if 'group' not in c] # exc_ind, inh1_ind, inh2_ind
+    elif grain == 'medium':
+        label_cols = [c for c in label_cols if 'group' in c] # e.g. mid_exc_group_ind, inh_group_ind
+    labels = [x[:-4] for x in label_cols]
+    if not filtered:
+        label_cols = [label + '_unfiltered_ind' for label in labels]
+
+    cluster_id_col = 'cluster_id' if filtered else 'cluster_id_unfiltered'
 
     # Iterate over sessions:
     dfs = []
     for r, row in df.iterrows():
 
         # Initialize dataframe for current session:
-        n_units = len([int(x) for x in row.cluster_id[1:-1].split(', ')])
+        n_units = len([int(x) for x in row[cluster_id_col][1:-1].split(', ')])
         curr_df = pd.DataFrame({neur_unit_idx_colname:np.arange(n_units)})
 
         if grain == 'fine':
 
             # Assign cluster labels:
-            curr_df.loc[:, 'cluster_id'] = row.cluster_id[1:-1].split(', ')
+            curr_df.loc[:, 'cluster_id'] = row[cluster_id_col][1:-1].split(', ')
             curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
 
-        elif grain == 'coarse':
+        elif grain in ('coarse', 'medium'):
 
             # For version of sheet deprecated as of 2026-06-25:
             # Get cluster IDs for current session:
-            cluster_ids_str = row.cluster_id
+            cluster_ids_str = row[cluster_id_col]
             cluster_ids_cropped = cluster_ids_str[1:-1]
             cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
             curr_df['cluster_id'] = cluster_ids
@@ -1689,8 +1697,8 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None
-            for c, col in enumerate(coarse_cluster_label_cols):
-                curr_cluster_label = coarse_cluster_labels[c]
+            for c, col in enumerate(label_cols):
+                curr_cluster_label = labels[c]
                 curr_inds_str = row[col]
 
                 # If no channels of current cluster, move to next cluster:
