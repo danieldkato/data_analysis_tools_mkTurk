@@ -1660,10 +1660,14 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     # The base columns (e.g. 'cluster_id', 'exc_ind') hold the filtered classification;
     # unfiltered counterparts are suffixed with '_unfiltered' (inserted before a trailing
     # '_ind', e.g. 'exc_unfiltered_ind', but appended after 'cluster_id' -> 'cluster_id_unfiltered').
-    coarse_cluster_label_cols = [c for c in df.columns if c.endswith('_ind') and 'filtered' not in c and 'cluster' not in c]
-    coarse_cluster_labels = [x[:-4] for x in coarse_cluster_label_cols]
+    label_cols = [c for c in df.columns if c.endswith('_ind') and 'filtered' not in c and 'cluster' not in c]
+    if grain == 'coarse':
+        label_cols = [c for c in label_cols if 'group' not in c] # exc_ind, inh1_ind, inh2_ind
+    elif grain == 'medium':
+        label_cols = [c for c in label_cols if 'group' in c] # e.g. mid_exc_group_ind, inh_group_ind
+    labels = [x[:-4] for x in label_cols]
     if not filtered:
-        coarse_cluster_label_cols = [label + '_unfiltered_ind' for label in coarse_cluster_labels]
+        label_cols = [label + '_unfiltered_ind' for label in labels]
 
     cluster_id_col = 'cluster_id' if filtered else 'cluster_id_unfiltered'
 
@@ -1681,7 +1685,7 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
             curr_df.loc[:, 'cluster_id'] = row[cluster_id_col][1:-1].split(', ')
             curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
 
-        elif grain == 'coarse':
+        elif grain in ('coarse', 'medium'):
 
             # For version of sheet deprecated as of 2026-06-25:
             # Get cluster IDs for current session:
@@ -1693,8 +1697,8 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
 
             # Try to assign cluster labels:
             curr_df['cluster_label'] = None
-            for c, col in enumerate(coarse_cluster_label_cols):
-                curr_cluster_label = coarse_cluster_labels[c]
+            for c, col in enumerate(label_cols):
+                curr_cluster_label = labels[c]
                 curr_inds_str = row[col]
 
                 # If no channels of current cluster, move to next cluster:
