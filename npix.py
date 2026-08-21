@@ -1645,6 +1645,9 @@ def split_ap_dv_coords(s, idx, delimiter=','):
 def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     """
     Read channel cluster labels (i.e. putative cell types) from CSV to dataframe.
+    If grain is None, assign fine, medium, and coarse grain labels to each unit
+    (as separate 'cluster_label_fine', 'cluster_label_medium', 'cluster_label_coarse'
+    columns) instead of a single 'cluster_label' column.
     """
 
     if unit_type == 'mua':
@@ -1660,16 +1663,25 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
     # The base columns (e.g. 'cluster_id', 'exc_ind') hold the filtered classification;
     # unfiltered counterparts are suffixed with '_unfiltered' (inserted before a trailing
     # '_ind', e.g. 'exc_unfiltered_ind', but appended after 'cluster_id' -> 'cluster_id_unfiltered').
-    label_cols = [c for c in df.columns if c.endswith('_ind') and 'filtered' not in c and 'cluster' not in c]
-    if grain == 'coarse':
-        label_cols = [c for c in label_cols if 'group' not in c] # exc_ind, inh1_ind, inh2_ind
-    elif grain == 'medium':
-        label_cols = [c for c in label_cols if 'group' in c] # e.g. mid_exc_group_ind, inh_group_ind
-    labels = [x[:-4] for x in label_cols]
-    if not filtered:
-        label_cols = [label + '_unfiltered_ind' for label in labels]
+    all_label_cols = [c for c in df.columns if c.endswith('_ind') and 'filtered' not in c and 'cluster' not in c]
+
+    def label_cols_for_grain(g):
+        cols = all_label_cols
+        if g == 'coarse':
+            cols = [c for c in cols if 'group' not in c] # exc_ind, inh1_ind, inh2_ind
+        elif g == 'medium':
+            cols = [c for c in cols if 'group' in c] # e.g. mid_exc_group_ind, inh_group_ind
+        labels = [x[:-4] for x in cols]
+        if not filtered:
+            cols = [label + '_unfiltered_ind' for label in labels]
+        return cols, labels
 
     cluster_id_col = 'cluster_id' if filtered else 'cluster_id_unfiltered'
+
+    # If grain is None, compute fine, medium, and coarse grain labels separately rather than
+    # picking a single grain to assign to 'cluster_label':
+    grains = ('fine', 'coarse', 'medium') if grain is None else (grain,)
+    grain_label_cols = {g: label_cols_for_grain(g) for g in grains if g != 'fine'}
 
     # Iterate over sessions:
     dfs = []
@@ -1679,39 +1691,44 @@ def read_cluster_labels(unit_type='mua', grain='fine', filtered=False):
         n_units = len([int(x) for x in row[cluster_id_col][1:-1].split(', ')])
         curr_df = pd.DataFrame({neur_unit_idx_colname:np.arange(n_units)})
 
-        if grain == 'fine':
+        for g in grains:
+            label_col = 'cluster_label' if grain is not None else 'cluster_label_{}'.format(g)
 
-            # Assign cluster labels:
-            curr_df.loc[:, 'cluster_id'] = row[cluster_id_col][1:-1].split(', ')
-            curr_df.loc[:, 'cluster_label'] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
+            if g == 'fine':
 
-        elif grain in ('coarse', 'medium'):
+                # Assign cluster labels:
+                curr_df.loc[:, 'cluster_id'] = row[cluster_id_col][1:-1].split(', ')
+                curr_df.loc[:, label_col] = curr_df.apply(lambda x : 'cluster_{}'.format(x.cluster_id) if int(x.cluster_id) >= 0 else None, axis=1)
 
-            # For version of sheet deprecated as of 2026-06-25:
-            # Get cluster IDs for current session:
-            cluster_ids_str = row[cluster_id_col]
-            cluster_ids_cropped = cluster_ids_str[1:-1]
-            cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
-            curr_df['cluster_id'] = cluster_ids
-            curr_df[neur_unit_idx_colname] = np.arange(curr_df.shape[0])
+            else:
 
-            # Try to assign cluster labels:
-            curr_df['cluster_label'] = None
-            for c, col in enumerate(label_cols):
-                curr_cluster_label = labels[c]
-                curr_inds_str = row[col]
+                label_cols, labels = grain_label_cols[g]
 
-                # If no channels of current cluster, move to next cluster:
-                isempty = curr_inds_str is None or\
-                    (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
-                    (type(curr_inds_str) and curr_inds_str[1:-1]=='')
-                if isempty:
-                    continue
+                # For version of sheet deprecated as of 2026-06-25:
+                # Get cluster IDs for current session:
+                cluster_ids_str = row[cluster_id_col]
+                cluster_ids_cropped = cluster_ids_str[1:-1]
+                cluster_ids = [int(x) for x in cluster_ids_cropped.split(',')]
+                curr_df['cluster_id'] = cluster_ids
+                curr_df[neur_unit_idx_colname] = np.arange(curr_df.shape[0])
 
-                curr_inds_cropped = curr_inds_str[1:-1]
-                print('curr_inds_cropped = {}'.format(curr_inds_cropped))
-                curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
-                curr_df.loc[curr_inds, 'cluster_label'] = curr_cluster_label
+                # Try to assign cluster labels:
+                curr_df[label_col] = None
+                for c, col in enumerate(label_cols):
+                    curr_cluster_label = labels[c]
+                    curr_inds_str = row[col]
+
+                    # If no channels of current cluster, move to next cluster:
+                    isempty = curr_inds_str is None or\
+                        (type(curr_inds_str)==float and np.isnan(curr_inds_str)) or\
+                        (type(curr_inds_str) and curr_inds_str[1:-1]=='')
+                    if isempty:
+                        continue
+
+                    curr_inds_cropped = curr_inds_str[1:-1]
+                    print('curr_inds_cropped = {}'.format(curr_inds_cropped))
+                    curr_inds = [int(x) for x in curr_inds_cropped.split(',')]
+                    curr_df.loc[curr_inds, label_col] = curr_cluster_label
 
         # Get session metadata:
         monkey = re.search(r'[a-zA-Z]{1,}', row.session).group()
