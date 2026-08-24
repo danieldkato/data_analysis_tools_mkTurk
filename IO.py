@@ -34,7 +34,7 @@ _DEFAULT_RDCC_NSLOTS = 1_000_003       # prime, per h5py's recommendation (~100x
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
     chunk_size=20, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
-    source='mua'):
+    source='mua', bin_chunk_size=None, compress_data=False):
     """
     Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
 
@@ -80,6 +80,20 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
     
     output_directory : str, optional
         Path to directory where HDF5 should be saved. The default is None.
+
+    bin_chunk_size : int, optional
+        Number of time bins to include in a single HDF5 chunk for the `data`
+        dataset. If None (the default — matches original behavior exactly),
+        each chunk spans the full time-bin extent, as before. Passing a value
+        smaller than the total number of bins lets partial reads restricted to
+        a peristimulus sub-window actually touch fewer bytes on disk, instead
+        of every chunk still spanning the entire recorded epoch regardless of
+        what a caller asks for.
+
+    compress_data : bool, optional
+        Whether to apply 'lzf' compression to the `data` dataset (the
+        `stim_indices` dataset is already compressed this way regardless).
+        The default is False, matching original behavior exactly.
 
     Returns
     -------
@@ -360,7 +374,17 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                 spike_chunks = None
                 stim_id_chunks = None
             else:
-                spike_chunks = (spike_counts.shape[0], spike_counts.shape[1], chunk_size, spike_counts.shape[3])
+                # Time-bin chunk extent: full extent by default (original
+                # behavior, unchanged unless a caller explicitly opts in via
+                # `bin_chunk_size`), or a caller-specified sub-extent so that
+                # a read restricted to a peristimulus sub-window can actually
+                # touch fewer bytes on disk instead of every chunk spanning
+                # the whole recorded epoch regardless of what's requested:
+                if bin_chunk_size is None:
+                    n_bin_chunk = spike_counts.shape[1]
+                else:
+                    n_bin_chunk = min(bin_chunk_size, spike_counts.shape[1])
+                spike_chunks = (spike_counts.shape[0], n_bin_chunk, chunk_size, spike_counts.shape[3])
                 stim_id_chunks = (chunk_size, stim_indices.shape[1])
 
             # Sanity-check chunk size before writing — warn if a single chunk is
@@ -373,8 +397,11 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
                         '`chunk_size` for more efficient partial reads.'.format(
                             chunk_bytes / 2**20, spike_chunks))
 
-            # Create dataset containing actual spike counts:
-            dset = f.create_dataset('data', data=spike_counts, dtype=dtype, chunks=spike_chunks)
+            # Create dataset containing actual spike counts. `compress_data`
+            # defaults to False, matching original (uncompressed) behavior
+            # exactly unless a caller explicitly opts in:
+            data_compression = 'lzf' if compress_data else None
+            dset = f.create_dataset('data', data=spike_counts, dtype=dtype, chunks=spike_chunks, compression=data_compression)
             #dset.attrs['trial_df'] = trial_df
 
             # Write scenefile-by-stim_id boolean matrix specifying which stim
@@ -540,11 +567,9 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
     Returns
     -------
     slices : numpy.ndarray
-        c-by-b-by-s, where c is the number of channels included in the input 
+        c-by-b-by-s, where c is the number of channels included in the input
         HDF5 file, b is the maximum number of time bins per trial, and s is the
         number of requested stimulus presentations.
-        
-    # TODO: Don't see any reason not to also filter by channel and time here. 
 
     """
 
@@ -553,7 +578,7 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
     # scheme instead of the 1MB h5py default:
     if isinstance(h5, (str, Path)):
         h5 = h5py.File(h5, 'r', rdcc_nbytes=_DEFAULT_RDCC_NBYTES, rdcc_nslots=_DEFAULT_RDCC_NSLOTS)
-    
+
     # Define default trial, channel, and time bin ranges if any are set to None:
     if trials is None:
         n_trials = h5[dset_name].shape[2]
@@ -566,42 +591,54 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
         channels = np.arange(n_chan)
     if time_window is None:
         n_bins = h5[dset_name].shape[1]
-        window = [0, n_bins]
-    
+        time_window = [0, n_bins]
+
     # Define requested trial range:
     min_trial = min(trials[:,0])
     max_trial = max(trials[:,0])
 
-    # Pre-fetch data from requested trial range:
+    # h5py's fancy indexing requires strictly increasing, unique indices along
+    # any axis, whereas `channels` (like plain NumPy indexing) may be given in
+    # any order and may contain repeats. Read the unique, sorted channels the
+    # underlying dataset actually supports, then reconstruct the originally
+    # requested channel order (with any repeats) afterward via `inverse`:
+    unique_channels, inverse = np.unique(channels, return_inverse=True)
+
+    # Pre-fetch data from requested trial range, restricted to the requested
+    # channels and time window at the HDF5 read itself, rather than reading
+    # the full channel/time extent and discarding the unneeded parts in NumPy
+    # afterward:
     print('Pre-fetching PSTHs from HDF5...')
     start_load = time.time()
-    data = h5[dset_name][:, :, min_trial:max_trial+1, :]
+    data = h5[dset_name][unique_channels, time_window[0]:time_window[1], min_trial:max_trial+1, :]
     stop_load = time.time()
     print('... done.')
     print('Duration={} minutes'.format((stop_load-start_load)/60))
 
+    # Restore the originally requested channel order/repeats:
+    data = data[inverse, :, :, :]
+
     # Offset trials by min trial:
     trials_offset = trials
     trials_offset[:,0] = trials_offset[:,0] -  min_trial
-    
+
     # Define boolean filter for which slices to grab:
     B = np.empty((data.shape[2], data.shape[3])).astype(bool)
     B[:] = False
     B[trials[:,0], trials[:,1]] = True
-    
+
     # Grab specific slices:
     print('Fancy slicing numpy array...')
     start_slice= time.time()
     slices = data[:, :, B]
-    slices = slices[channels, time_window[0]:time_window[1], :]
     stop_slice= time.time()
     print('... done.')
     print('Duration={} minutes'.format((stop_slice-start_slice)/60))
 
-    # Hack; input HDF5s are saved as int32 to reduce space, I/O time, but this 
+    # Hack; input HDF5s are saved as int32 to reduce space, I/O time, but this
     # has effect of turning nan into -2*10^9; convert back to nan here:
     slices = slices.astype(np.float32)
-    #slices[slices<-2e9] = np.nan 
+    #slices[slices<-2e9] = np.nan
 
     return slices
 
