@@ -638,7 +638,7 @@ def h5_2_dat_array_rsvp(h5, trials=None, channels=None, time_window=None, dset_n
     # Hack; input HDF5s are saved as int32 to reduce space, I/O time, but this
     # has effect of turning nan into -2*10^9; convert back to nan here:
     slices = slices.astype(np.float32)
-    #slices[slices<-2e9] = np.nan
+    slices[slices<-2e9] = np.nan
 
     return slices
 
