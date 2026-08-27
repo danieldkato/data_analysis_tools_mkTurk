@@ -1,6 +1,8 @@
 import os
 import sys
 import time
+import socket
+import hashlib
 from datetime import datetime
 from pathlib import Path
 import glob
@@ -14,11 +16,14 @@ import numpy as np
 import pandas as pd
 import json
 from itertools import product
-from .utils_meta import find_channels, find_units, get_recording_path, get_coords_sess, get_all_metadata_sess
+from concurrent.futures import ThreadPoolExecutor
+from .utils_meta import find_channels, find_units, get_recording_path, get_coords_sess, get_all_metadata_sess, resolve_ks_h5_path
 from .stim_info import filter_stim_trials, expand_classes, get_class_trials, create_trial_df, create_stim_idx_mat, reverse_lookup_rsvp_stim, session_dicts_2_df, sess_meta_dict_2_df
-from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords
+from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords, h5_2_ch_meta
 from .spike_sorting.quality_metrics import build_unit_info_dfs
 from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
+from mkutils_ddk.env import get_engram_drive
+from mkanalysis.general import matches_any_predicate
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -1528,3 +1533,494 @@ def find_complete_rsvp_slots(bfile):
 
     return rsvp_df
             
+
+# ---------------------------------------------------------------------------
+# The functions below (find_h5_path through sessions2trials_cached) were
+# moved here from mkutils_ddk/IO.py (a separate git repository), where they
+# originally lived. Full commit-level history for this code is not directly
+# traceable via `git log`/`git blame` from here, since git's history
+# tracking doesn't cross repository boundaries -- see these commits in
+# mkutils_ddk for the original authorship/history:
+#   c8284da  Add unit_type param to sessions2trials(), pass to find_h5_path()
+#   439d504  Add support for finding kilosorted HDF5 in find_h5_path()
+#   9d12b79  Add per-session cached loader for spike data
+#   6716382  Key the PSTH cache on concrete trial tuples, not filter source text
+#   14953b4  Fetch sessions concurrently in the trial-params and PSTH caches
+# ---------------------------------------------------------------------------
+
+
+
+def find_h5_path(monkey, date, unit_type='mua'):
+    """
+    Find path to HDF5 of preprocessed PSTHs for given monkey and session.
+
+    Parameters
+    ----------
+    monkey : str
+        Monkey name.
+
+    date : str
+        Date, formatted <yyyymmdd>.
+
+    Returns
+    -------
+    h5_path : str
+        Path to HDF5 of preprocessed PSTHs for requested monkey, session.
+
+    """
+
+    if unit_type == 'ks':
+        # Delegate to resolve_ks_h5_path, which matches the path spike_sorting.process_ks_data()
+        # actually writes to (derived from the save-out recording dir, not the raw data one --
+        # the two can diverge, unlike the mua case handled below).
+        try:
+            return str(resolve_ks_h5_path(monkey, date))
+        except Exception:
+            print('H5 file not found for {}, {}'.format(monkey, date))
+            return None
+
+    #engram_drive = get_engram_drive()
+
+    hostname = socket.gethostname()
+    try:
+        if 'rc.zi.columbia.edu' in hostname:
+            engram_drive = get_engram_drive()
+            base_data_path = os.path.join(engram_drive, 'Data')
+            folder_level_offset = 4
+            recording_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
+            dirname = recording_path.split(os.path.sep)[folder_level_offset+3]
+            preprocessed_data_dir = os.path.join(engram_drive, 'users', 'Dan', 'ephys', monkey, dirname)
+        else:
+            if hostname == 'DESKTOP-1PVCRAF':
+                local_preprocessed_dir = 'F:\\'
+            elif hostname == 'DESKTOP-PJOJ7HT':
+                local_preprocessed_dir = os.path.join('C:\\', 'Users', 'danie', 'Documents')
+            h5dir = os.path.join(local_preprocessed_dir, 'h5s_test')
+            preprocessed_data_dir = os.path.join(h5dir, monkey)
+
+        h5_path = os.path.join(preprocessed_data_dir, '{}.h5'.format(date))
+    except:
+        print('H5 file not found for {}, {}'.format(monkey, date))
+        h5_path = None
+
+    return h5_path
+
+
+
+_CACHE_SCHEMA_VERSION = 2  # bumped: psth cache key is now value-based (trial/rsvp tuples), not filter-text-based
+
+
+
+def _build_fetch_flt(misc_flt, group_defs):
+    """
+    Build the row-predicate callable used to filter trials, from misc_flt +
+    group_defs only. A trial passes if it satisfies misc_flt AND matches at
+    least one group_def's 'definition'. Used by `filter_trial_params`.
+    """
+    group_predicates = [gd['definition'] for gd in group_defs] if group_defs else []
+
+    def flt(row):
+        if misc_flt is not None and not misc_flt(row):
+            return False
+        if len(group_predicates) == 0:
+            return True
+        return matches_any_predicate(row, group_predicates)
+
+    return flt
+
+
+
+def filter_trial_params(trial_params_df, misc_flt=None, group_defs=None):
+    """
+    Apply misc_flt + group_defs (conditions) to a trial_params dataframe --
+    e.g. the output of `sessions2trial_params_cached` -- returning only the
+    rows that pass. Deliberately does NOT take class_defs/dichotomies; those
+    are applied downstream on already-loaded PSTH data.
+
+    The point of doing this as an explicit, separate step (rather than
+    passing misc_flt/group_defs into a PSTH-fetching function directly) is
+    that its *output* -- concrete (monkey, date, trial_num, rsvp_num) rows --
+    is what should determine the PSTH cache key, not the filter functions
+    themselves. Two notebooks with differently-worded but equivalent
+    misc_flt/group_defs will produce the same filtered rows and therefore
+    share the same `sessions2trials_cached` cache entries; two notebooks
+    that only shared a cache key by filter-function source text would not.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Subset of `trial_params_df` whose rows satisfy the filter, columns
+        unchanged.
+    """
+    flt = _build_fetch_flt(misc_flt, group_defs)
+    return trial_params_df[trial_params_df.apply(flt, axis=1)].reset_index(drop=True)
+
+
+
+def _h5_fingerprint(h5_path):
+    if h5_path is not None and os.path.exists(h5_path):
+        stat = os.stat(h5_path)
+        return [stat.st_mtime, stat.st_size]
+    return None
+
+
+
+def _trial_params_cache_key(monkey, date, unit_type, h5_path):
+    """
+    Cache key for the *unfiltered* per-session trial_params cache -- depends
+    only on which session/file is being read, never on any filter.
+    """
+    key_parts = {
+        'schema_version': _CACHE_SCHEMA_VERSION,
+        'monkey': monkey,
+        'date': date,
+        'unit_type': unit_type,
+        'h5_path': h5_path,
+        'h5_fingerprint': _h5_fingerprint(h5_path),
+    }
+    key_str = json.dumps(key_parts, sort_keys=True, default=str)
+    key_hash = hashlib.sha256(key_str.encode('utf-8')).hexdigest()[:16]
+    return key_hash, key_parts
+
+
+
+def _fetch_one_trial_params(monkey, date, unit_type, cache_root, force_refresh):
+    """
+    Single-session worker for `sessions2trial_params_cached`, factored out
+    so it can be dispatched to a thread pool. Returns None (with a warning)
+    if the session's H5 can't be found, so callers can filter Nones out of
+    a parallel-map result list.
+    """
+    h5_path = find_h5_path(monkey, date, unit_type=unit_type)
+    if h5_path is None or not os.path.exists(h5_path):
+        warnings.warn('H5 file for {}, {} not found.'.format(monkey, date))
+        return None
+
+    key_hash, key_parts = _trial_params_cache_key(monkey, date, unit_type, h5_path)
+    cache_dir = os.path.join(cache_root, 'trial_params', unit_type, '{}_{}'.format(monkey, date), key_hash)
+    trial_params_path = os.path.join(cache_dir, 'trial_params.h5')
+    meta_path = os.path.join(cache_dir, 'meta.json')
+
+    if not force_refresh and os.path.exists(trial_params_path):
+        print('{}, {}... (trial params cache hit)'.format(monkey, date))
+        tdf = pd.read_hdf(trial_params_path, 'trial_params')
+    else:
+        print('{}, {}... (fetching trial params from HDF5)'.format(monkey, date))
+        tdf = h5_2_trial_df(h5_path, 'all')
+        os.makedirs(cache_dir, exist_ok=True)
+        tdf.to_hdf(trial_params_path, 'trial_params', mode='w', format='fixed')
+        with open(meta_path, 'w') as f:
+            json.dump(key_parts, f, indent=1, default=str)
+
+    return tdf
+
+
+
+def sessions2trial_params_cached(sessions_df, unit_type='mua', cache_root=None, force_refresh=False, max_workers=8):
+    """
+    Load (and cache) the FULL, unfiltered trial_params table for each
+    requested session -- step 1-2 of the recommended workflow: load once,
+    cache per-session, then filter in-memory (see `filter_trial_params`) as
+    many times as needed without re-touching HDF5.
+
+    Cheap to call repeatedly with a growing `sessions_df`: only sessions not
+    already cached (or whose source HDF5 has changed) trigger an actual
+    HDF5 read via `h5_2_trial_df`; already-cached sessions are served
+    straight from disk. Unlike `sessions2trials_cached`, there is no filter
+    dependence at all in this cache's key, since it holds every trial in the
+    session, unfiltered.
+
+    Sessions are fetched concurrently (see `max_workers`) since each
+    session's read is independent and I/O-bound (dominated by network
+    filesystem latency, not CPU), rather than serially as in earlier
+    versions of this function.
+
+    Parameters
+    ----------
+    sessions_df : pandas.DataFrame
+        Must define 'monkey', 'date' columns.
+
+    unit_type : str
+        'mua' | 'ks'.
+
+    cache_root : str
+        Root directory for the on-disk cache. Required -- e.g.
+        `os.path.join(mnt, 'users', 'Dan', 'ephys', 'spike_cache')`. Uses a
+        `trial_params/` subdirectory, so it can share a `cache_root` with
+        `sessions2trials_cached` without colliding.
+
+    force_refresh : bool
+        If True, ignore any existing cache entry and re-fetch + overwrite it.
+
+    max_workers : int | None
+        Number of sessions to fetch concurrently, via a thread pool (threads,
+        not processes -- the work here is I/O-bound network reads, not CPU,
+        and threads keep everything in one process/address space so a cache
+        hit's memmapped array stays a lazy view rather than being pickled
+        across a process boundary). Set to 1 or None to fetch serially
+        (e.g. for cleaner interleaved console output while debugging). The
+        default of 8 is a reasonable starting point, not a tuned value --
+        the network filesystem itself may cap useful concurrency lower (SMB2
+        has its own flow-control credit limit observed elsewhere in this
+        codebase's investigation), so reduce it if higher settings don't
+        help or if fetches start erroring under contention.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Concatenated, unfiltered trial_params for all requested sessions.
+    """
+    if cache_root is None:
+        raise ValueError('cache_root must be specified (no hardcoded default -- '
+                          'e.g. os.path.join(mnt, "users", "Dan", "ephys", "spike_cache")).')
+
+    sessions_df = sessions_df[['monkey', 'date']].drop_duplicates()
+    session_list = list(sessions_df.itertuples(index=False, name=None))
+
+    if max_workers is not None and max_workers > 1 and len(session_list) > 1:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            dfs = list(executor.map(
+                lambda s: _fetch_one_trial_params(s[0], s[1], unit_type, cache_root, force_refresh),
+                session_list))
+    else:
+        dfs = [_fetch_one_trial_params(monkey, date, unit_type, cache_root, force_refresh)
+               for monkey, date in session_list]
+
+    dfs = [d for d in dfs if d is not None]
+    return pd.concat(dfs, axis=0).reset_index(drop=True) if dfs else pd.DataFrame()
+
+
+
+def _psth_cache_key(monkey, date, unit_type, h5_path, channels, time_window, pairs_sorted):
+    """
+    Cache key for the PSTH cache -- depends on the *exact set* of
+    (trial_num, rsvp_num) pairs being requested for this session, not on any
+    filter function's identity/source text. Two independently-constructed
+    request sets that resolve to the same pairs produce the same key.
+    """
+    channels_key = 'all' if channels is None else sorted(np.asarray(channels).tolist())
+    time_window_key = 'all' if time_window is None else list(time_window)
+    key_parts = {
+        'schema_version': _CACHE_SCHEMA_VERSION,
+        'monkey': monkey,
+        'date': date,
+        'unit_type': unit_type,
+        'h5_path': h5_path,
+        'h5_fingerprint': _h5_fingerprint(h5_path),
+        'channels': channels_key,
+        'time_window': time_window_key,
+        'trial_rsvp_pairs': [list(p) for p in pairs_sorted],
+    }
+    key_str = json.dumps(key_parts, sort_keys=True, default=str)
+    key_hash = hashlib.sha256(key_str.encode('utf-8')).hexdigest()[:16]
+    return key_hash, key_parts
+
+
+
+def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_window, cache_root, force_refresh):
+    """
+    Single-session worker for `sessions2trials_cached`, factored out so it
+    can be dispatched to a thread pool. Returns None (with a warning) if the
+    session's H5 can't be found; otherwise returns
+    (spikes_df_for_this_session, (zero_coords_row, imro_rows) | None).
+    Deliberately returns rather than mutates shared accumulator state, so
+    results from concurrently-running workers can be combined afterward in
+    the calling thread without any risk of a race.
+    """
+    h5_path = find_h5_path(monkey, date, unit_type=unit_type)
+    if h5_path is None or not os.path.exists(h5_path):
+        warnings.warn('H5 file for {}, {} not found.'.format(monkey, date))
+        return None
+
+    # Canonical, order-independent representation of exactly which
+    # stimulus presentations are being requested for this session:
+    pairs_sorted = sorted(set(zip(group['trial_num'].astype(int), group['rsvp_num'].astype(int))))
+
+    key_hash, key_parts = _psth_cache_key(monkey, date, unit_type, h5_path, channels, time_window, pairs_sorted)
+    cache_dir = os.path.join(cache_root, unit_type, '{}_{}'.format(monkey, date), key_hash)
+    psth_path = os.path.join(cache_dir, 'psth.npy')
+    index_path = os.path.join(cache_dir, 'trial_index.h5')
+    meta_path = os.path.join(cache_dir, 'meta.json')
+
+    cache_hit = not force_refresh and os.path.exists(psth_path) and os.path.exists(index_path)
+
+    if cache_hit:
+        index_df = pd.read_hdf(index_path, 'trial_index')
+        psth_arr = np.load(psth_path, mmap_mode='r')
+        if len(index_df) != psth_arr.shape[0]:
+            warnings.warn(
+                'Cache entry for {}, {} is inconsistent (trial_index/psth row '
+                'count mismatch) -- re-fetching.'.format(monkey, date))
+            cache_hit = False
+
+    if cache_hit:
+        print('{}, {}... (cache hit, {} trials)'.format(monkey, date, len(index_df)))
+    else:
+        print('{}, {}... (fetching PSTHs from HDF5)'.format(monkey, date))
+        spike_inds = np.array(pairs_sorted)
+        # h5_2_dat_array_rsvp's output order is always ascending
+        # (trial_num, rsvp_num), independent of the input order of
+        # `trials` -- verified directly -- so `pairs_sorted` (built with
+        # the same ascending-tuple sort) already matches row-for-row.
+        #
+        # h5_2_dat_array_rsvp takes time_window as *bin indices*, not
+        # seconds (unlike this function's own `time_window`, which is in
+        # seconds relative to stim onset, matching h5_2_df's contract).
+        # h5_2_df normally does this conversion; called directly here
+        # (bypassing h5_2_df's own redundant trial_params read), so the
+        # conversion is replicated here instead:
+        with h5py.File(h5_path, 'r', rdcc_nbytes=_DEFAULT_RDCC_NBYTES, rdcc_nslots=_DEFAULT_RDCC_NSLOTS) as h5:
+            if time_window is not None:
+                psth_bins = h5.attrs['psth_bins']
+                bin_indices = time_window2bin_indices(time_window, psth_bins)
+            else:
+                bin_indices = None
+            raw = h5_2_dat_array_rsvp(h5, trials=spike_inds.copy(), channels=channels, time_window=bin_indices)
+        psth_arr = np.transpose(raw, axes=[2, 0, 1])  # c-by-b-by-s -> s-by-c-by-b
+        index_df = pd.DataFrame(pairs_sorted, columns=['trial_num', 'rsvp_num'])
+
+        os.makedirs(cache_dir, exist_ok=True)
+        np.save(psth_path, psth_arr)
+        index_df.to_hdf(index_path, 'trial_index', mode='w', format='fixed')
+        with open(meta_path, 'w') as f:
+            json.dump(key_parts, f, indent=1, default=str)
+        psth_arr = np.load(psth_path, mmap_mode='r')
+
+    # Attach psth to `group` in its OWN original row order (which may
+    # differ from -- and may be a subset of -- the cache's sorted order):
+    pair_to_idx = {pair: i for i, pair in enumerate(zip(index_df['trial_num'], index_df['rsvp_num']))}
+    row_order = [pair_to_idx[(tn, rn)] for tn, rn in zip(group['trial_num'].astype(int), group['rsvp_num'].astype(int))]
+    curr_out = group.copy()
+    curr_out['psth'] = [psth_arr[i] for i in row_order]
+
+    # chs_meta is a cheap PyTables-format read, always re-fetched fresh
+    # regardless of cache hit/miss (no need to cache it separately):
+    ch_meta_result = None
+    try:
+        curr_zero_coords, curr_imro_tbl = h5_2_ch_meta(h5_path)
+        curr_zero_coords['monkey'] = monkey
+        curr_zero_coords['date'] = date
+        curr_imro_tbl['monkey'] = monkey
+        curr_imro_tbl['date'] = date
+        curr_imro_tbl['ch_idx_glx'] = curr_imro_tbl.index
+        ch_meta_result = (pd.DataFrame(curr_zero_coords).T, curr_imro_tbl)
+    except Exception as e:
+        warnings.warn('Failed to find recording site metadata for {} session {}.'.format(monkey, date))
+
+    return curr_out, ch_meta_result
+
+
+
+def sessions2trials_cached(trials_df, unit_type='mua', channels=None, time_window=None,
+    cache_root=None, force_refresh=False, max_workers=8):
+    """
+    Attach PSTH arrays to `trials_df` -- step 3-4 of the recommended
+    workflow. `trials_df` must have 'monkey', 'date', 'trial_num', 'rsvp_num'
+    columns identifying exactly which stimulus presentations to fetch (e.g.
+    the output of `filter_trial_params` applied to
+    `sessions2trial_params_cached`'s output), plus whatever other trial
+    parameter columns the caller wants preserved in the result.
+
+    Unlike the previous (v1) design, this does NOT take misc_flt/group_defs
+    directly -- the PSTH cache key for each session is the exact sorted set
+    of (trial_num, rsvp_num) pairs present for that session in `trials_df`.
+    This makes the cache shareable across notebooks/callers: two
+    independently-built `trials_df` inputs (e.g. from differently-worded but
+    semantically equivalent misc_flt/group_defs in different notebooks) that
+    resolve to the same underlying tuples hit the same cache entry,
+    regardless of how each notebook happened to compute them. Also depends
+    on unit_type, channels, time_window, and each session's source HDF5 file
+    (mtime+size fingerprint). Downstream-only parameters (class_defs,
+    dichotomies, z-scoring, binning) never enter `trials_df` and so can
+    never affect this cache.
+
+    Parameters
+    ----------
+    trials_df : pandas.DataFrame
+        Must define 'monkey', 'date', 'trial_num', 'rsvp_num'.
+
+    unit_type : str
+        'mua' | 'ks'.
+
+    channels : array-like | None
+        Indices of channels/units to get PSTH data for. If None, all
+        channels.
+
+    time_window : array-like | None
+        2-element [start, stop] in seconds relative to stim onset. If None,
+        the entire recorded peristim epoch.
+
+    cache_root : str
+        Root directory for the on-disk cache. Required -- e.g.
+        `os.path.join(mnt, 'users', 'Dan', 'ephys', 'spike_cache')`.
+
+    force_refresh : bool
+        If True, ignore any existing cache entry and re-fetch + overwrite it.
+
+    max_workers : int | None
+        Number of sessions to fetch concurrently, via a thread pool -- see
+        `sessions2trial_params_cached`'s `max_workers` docstring for the same
+        reasoning (I/O-bound work, threads over processes to keep memmapped
+        cache-hit arrays lazy, default of 8 not a tuned value). Set to 1 or
+        None to fetch serially.
+
+    Returns
+    -------
+    spikes_df : pandas.DataFrame
+        `trials_df`, in its original row order, with a new 'psth' column
+        attached (memmapped array views on a cache hit).
+
+    chs_meta : dict
+        Same shape as `sessions2trials`'s return value.
+    """
+    if cache_root is None:
+        raise ValueError('cache_root must be specified (no hardcoded default -- '
+                          'e.g. os.path.join(mnt, "users", "Dan", "ephys", "spike_cache")).')
+
+    required_cols = {'monkey', 'date', 'trial_num', 'rsvp_num'}
+    missing = required_cols - set(trials_df.columns)
+    if missing:
+        raise ValueError('trials_df is missing required columns: {}'.format(missing))
+
+    groups = list(trials_df.groupby(['monkey', 'date'], sort=False))
+
+    if max_workers is not None and max_workers > 1 and len(groups) > 1:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_fetch_one_session_psth, monkey, date, group, unit_type, channels, time_window, cache_root, force_refresh)
+                for (monkey, date), group in groups
+            ]
+            results = [f.result() for f in futures]
+    else:
+        results = [
+            _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_window, cache_root, force_refresh)
+            for (monkey, date), group in groups
+        ]
+
+    out_dfs = []
+    zero_coords_df = pd.DataFrame()
+    imro_df = pd.DataFrame()
+    for r in results:
+        if r is None:
+            continue
+        curr_out, ch_meta_result = r
+        out_dfs.append(curr_out)
+        if ch_meta_result is not None:
+            curr_zero_coords_row, curr_imro_tbl = ch_meta_result
+            zero_coords_df = pd.concat([zero_coords_df, curr_zero_coords_row], axis=0)
+            imro_df = pd.concat([imro_df, curr_imro_tbl], axis=0)
+
+    spikes_df = pd.concat(out_dfs, axis=0) if len(out_dfs) > 0 else pd.DataFrame()
+    spikes_df.index = np.arange(spikes_df.shape[0])
+    spikes_df.loc[:, 'unit_type'] = unit_type
+
+    if zero_coords_df.shape[0] > 0:
+        zero_coords_df = zero_coords_df[['monkey', 'date', 'hemisphere', 'hole_id', 'penetration', 'AP', 'DV', 'ML', 'Ang', 'HAng', 'depth']]
+    zero_coords_df.loc[:, 'unit_type'] = unit_type
+    imro_df.index = np.arange(imro_df.shape[0])
+    if imro_df.shape[0] > 0:
+        imro_df = imro_df[['monkey', 'date', 'ch_idx_glx', 'bank', 'ref_id', 'ap_gain', 'ap_hipass']]
+    imro_df.loc[:, 'unit_type'] = unit_type
+    ch_meta = {'zero_coords': zero_coords_df, 'imro_tbl': imro_df}
+
+    return spikes_df, ch_meta
