@@ -34,7 +34,7 @@ _DEFAULT_RDCC_NSLOTS = 1_000_003       # prime, per h5py's recommendation (~100x
 
 def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels=None,
     chunk_size=20, dtype=np.float32, save_output=False, fname='all_psth', output_directory=None,
-    source='mua', bin_chunk_size=None, compress_data=False):
+    source='mua', bin_chunk_size=None, compress_data=False, trial_params_format='table'):
     """
     Combine pickled dicts of single-channel (or single-unit) PSTHs into single HDF5.
 
@@ -94,6 +94,18 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         Whether to apply 'lzf' compression to the `data` dataset (the
         `stim_indices` dataset is already compressed this way regardless).
         The default is False, matching original behavior exactly.
+
+    trial_params_format : 'table' | 'fixed', optional
+        PyTables storage format for the full `trial_params` table. The
+        default 'table' matches original behavior exactly, but is dramatically
+        slower to read back over a network filesystem (observed ~350x on one
+        real 259-column session table) than 'fixed', since 'table' uses an
+        indexed, per-dtype-block on-disk layout meant for partial/`where=`
+        queries -- expensive to deserialize even for object/mixed-type
+        columns fully read every time regardless. No code anywhere queries
+        this table partially (`h5_2_trial_df` always reads it in full), so
+        'fixed' -- which stores it as a single flat, quick-to-deserialize
+        blob -- is safe to opt into with no functional loss.
 
     Returns
     -------
@@ -429,10 +441,16 @@ def ch_dicts_2_h5(base_data_path, monkey, date, preprocessed_data_path, channels
         # h5py handle is now closed; append the pandas dataframes (PyTables) to
         # the same file, one open at a time.
 
-        # Write full dataframe of trial parameters:
+        # Write full dataframe of trial parameters. format='fixed' reads back
+        # dramatically faster than format='table' for a full-table read (the
+        # only way this table is ever read -- no partial/`where=` queries
+        # exist anywhere on it) since it avoids format='table's indexed,
+        # per-dtype-block on-disk layout; format='table' remains the default
+        # here only for backward compatibility (opt in via
+        # trial_params_format='fixed'):
         trial_params_df_out = trial_params_df.copy()
         trial_params_df_out = standardize_col_types(trial_params_df_out)
-        trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format='table')
+        trial_params_df_out.to_hdf(output_path, 'trial_params', 'a', format=trial_params_format)
 
         #"""
         # Write truncated dataframe of select trial parameters:
