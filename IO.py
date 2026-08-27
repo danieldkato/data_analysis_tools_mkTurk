@@ -1589,7 +1589,7 @@ def find_h5_path(monkey, date, unit_type='mua'):
             folder_level_offset = 4
             recording_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
             dirname = recording_path.split(os.path.sep)[folder_level_offset+3]
-            preprocessed_data_dir = os.path.join(engram_drive, 'users', 'Dan', 'ephys', monkey, dirname)
+            preprocessed_data_dir = os.path.join(engram_drive, 'processed_h5', monkey, dirname, 'mua')
         else:
             if hostname == 'DESKTOP-1PVCRAF':
                 local_preprocessed_dir = 'F:\\'
