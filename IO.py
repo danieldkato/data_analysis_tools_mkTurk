@@ -1817,6 +1817,64 @@ def _psth_cache_key(monkey, date, unit_type, h5_path, channels, time_window, pai
 
 
 
+def _find_superset_psth_cache_entry(monkey, date, unit_type, channels, time_window, h5_fingerprint, pairs_sorted, cache_root):
+    """
+    Look for an existing PSTH cache entry for this session (e.g. from an
+    earlier run with broader misc_flt/group_defs) whose cached trial/RSVP
+    pairs are a superset of `pairs_sorted`, so it can be served instead of
+    re-fetching from HDF5. Only (channels, time_window, h5_fingerprint) must
+    match exactly; a single existing entry must cover the full request --
+    this does not union rows across multiple partial entries.
+
+    Returns (cache_dir, index_df, psth_arr) for the first matching entry
+    found, or None if no existing entry is a superset.
+    """
+    session_dir = os.path.join(cache_root, unit_type, '{}_{}'.format(monkey, date))
+    if not os.path.isdir(session_dir):
+        return None
+
+    channels_key = 'all' if channels is None else sorted(np.asarray(channels).tolist())
+    time_window_key = 'all' if time_window is None else list(time_window)
+    requested_pairs = set(pairs_sorted)
+
+    for entry_name in os.listdir(session_dir):
+        meta_path = os.path.join(session_dir, entry_name, 'meta.json')
+        if not os.path.exists(meta_path):
+            continue
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        if meta.get('schema_version') != _CACHE_SCHEMA_VERSION:
+            continue
+        if meta.get('channels') != channels_key or meta.get('time_window') != time_window_key:
+            continue
+        if meta.get('h5_fingerprint') != h5_fingerprint:
+            continue
+
+        cached_pairs = set(tuple(p) for p in meta.get('trial_rsvp_pairs', []))
+        if not requested_pairs.issubset(cached_pairs):
+            continue
+
+        cache_dir = os.path.join(session_dir, entry_name)
+        psth_path = os.path.join(cache_dir, 'psth.npy')
+        index_path = os.path.join(cache_dir, 'trial_index.h5')
+        if not (os.path.exists(psth_path) and os.path.exists(index_path)):
+            continue
+
+        index_df = pd.read_hdf(index_path, 'trial_index')
+        psth_arr = np.load(psth_path, mmap_mode='r')
+        if len(index_df) != psth_arr.shape[0]:
+            continue
+
+        return cache_dir, index_df, psth_arr
+
+    return None
+
+
+
 def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_window, cache_root, force_refresh):
     """
     Single-session worker for `sessions2trials_cached`, factored out so it
@@ -1826,6 +1884,10 @@ def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_windo
     Deliberately returns rather than mutates shared accumulator state, so
     results from concurrently-running workers can be combined afterward in
     the calling thread without any risk of a race.
+
+    On a miss against this request's own exact-key cache entry, also checks
+    for an existing entry whose cached pairs are a superset of what's needed
+    (see `_find_superset_psth_cache_entry`) before falling back to HDF5.
     """
     h5_path = find_h5_path(monkey, date, unit_type=unit_type)
     if h5_path is None or not os.path.exists(h5_path):
@@ -1853,8 +1915,26 @@ def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_windo
                 'count mismatch) -- re-fetching.'.format(monkey, date))
             cache_hit = False
 
+    # No exact-key entry -- look for an existing entry from a broader past
+    # request (e.g. different misc_flt/group_defs) whose cached trial/RSVP
+    # pairs are a superset of what's needed here, and serve the subset from
+    # it instead of re-fetching from HDF5. Doesn't write a new exact-key
+    # entry for this request -- a repeat of the same request re-scans rather
+    # than hitting an O(1) hash lookup, which is fine unless/until that scan
+    # becomes a hot path.
+    superset_hit = False
+    if not cache_hit and not force_refresh:
+        superset_entry = _find_superset_psth_cache_entry(
+            monkey, date, unit_type, channels, time_window, key_parts['h5_fingerprint'], pairs_sorted, cache_root)
+        if superset_entry is not None:
+            _, index_df, psth_arr = superset_entry
+            superset_hit = True
+
     if cache_hit:
         print('{}, {}... (cache hit, {} trials)'.format(monkey, date, len(index_df)))
+    elif superset_hit:
+        print('{}, {}... (cache hit via superset entry, {} of {} trials)'.format(
+            monkey, date, len(pairs_sorted), len(index_df)))
     else:
         print('{}, {}... (fetching PSTHs from HDF5)'.format(monkey, date))
         spike_inds = np.array(pairs_sorted)
