@@ -1817,17 +1817,21 @@ def _psth_cache_key(monkey, date, unit_type, h5_path, channels, time_window, pai
 
 
 
-def _find_superset_psth_cache_entry(monkey, date, unit_type, channels, time_window, h5_fingerprint, pairs_sorted, cache_root):
+def _find_superset_psth_cache_entry(monkey, date, unit_type, h5_path, channels, time_window, h5_fingerprint, pairs_sorted, cache_root):
     """
     Look for an existing PSTH cache entry for this session (e.g. from an
-    earlier run with broader misc_flt/group_defs) whose cached trial/RSVP
-    pairs are a superset of `pairs_sorted`, so it can be served instead of
-    re-fetching from HDF5. Only (channels, time_window, h5_fingerprint) must
-    match exactly; a single existing entry must cover the full request --
-    this does not union rows across multiple partial entries.
+    earlier run with broader misc_flt/group_defs, or a wider time_window)
+    whose cached trial/RSVP pairs are a superset of `pairs_sorted` and whose
+    cached time window contains `time_window`, so it can be served instead
+    of re-fetching from HDF5 -- slicing the time-bin axis down as well as
+    the trial axis, if the cached window is wider than what's requested.
+    `channels` must still match exactly (not treated as a containment
+    relationship). A single existing entry must cover the full request --
+    this does not union rows/bins across multiple partial entries.
 
-    Returns (cache_dir, index_df, psth_arr) for the first matching entry
-    found, or None if no existing entry is a superset.
+    Returns (index_df, psth_arr) for the first matching entry found --
+    `psth_arr` already sliced down to `time_window` if the match came from a
+    wider cached window -- or None if no existing entry is a superset.
     """
     session_dir = os.path.join(cache_root, unit_type, '{}_{}'.format(monkey, date))
     if not os.path.isdir(session_dir):
@@ -1836,6 +1840,7 @@ def _find_superset_psth_cache_entry(monkey, date, unit_type, channels, time_wind
     channels_key = 'all' if channels is None else sorted(np.asarray(channels).tolist())
     time_window_key = 'all' if time_window is None else list(time_window)
     requested_pairs = set(pairs_sorted)
+    psth_bins = None  # lazily loaded from the H5 attrs, only if actually needed for bin-index math
 
     for entry_name in os.listdir(session_dir):
         meta_path = os.path.join(session_dir, entry_name, 'meta.json')
@@ -1849,7 +1854,7 @@ def _find_superset_psth_cache_entry(monkey, date, unit_type, channels, time_wind
 
         if meta.get('schema_version') != _CACHE_SCHEMA_VERSION:
             continue
-        if meta.get('channels') != channels_key or meta.get('time_window') != time_window_key:
+        if meta.get('channels') != channels_key:
             continue
         if meta.get('h5_fingerprint') != h5_fingerprint:
             continue
@@ -1869,7 +1874,35 @@ def _find_superset_psth_cache_entry(monkey, date, unit_type, channels, time_wind
         if len(index_df) != psth_arr.shape[0]:
             continue
 
-        return cache_dir, index_df, psth_arr
+        cached_time_window = meta.get('time_window')
+        if cached_time_window == time_window_key:
+            # Exact time-window match -- no bin slicing needed:
+            return index_df, psth_arr
+
+        # A specific (non-'all') cached window can never contain an 'all'
+        # (time_window is None) request:
+        if time_window is None:
+            continue
+
+        # h5_2_dat_array_rsvp's bin_indices convention (verified against a
+        # real fetch) is a standard half-open [start, stop) range -- the
+        # cached array's bin axis already has exactly (stop - start) bins,
+        # 0-indexed from `start`, matching the slicing below:
+        if psth_bins is None:
+            with h5py.File(h5_path, 'r') as h5:
+                psth_bins = h5.attrs['psth_bins']
+
+        req_start, req_stop = time_window2bin_indices(time_window, psth_bins)
+
+        if cached_time_window == 'all':
+            cached_start, cached_stop = 0, psth_arr.shape[-1]
+        else:
+            cached_start, cached_stop = time_window2bin_indices(cached_time_window, psth_bins)
+
+        if not (cached_start <= req_start and req_stop <= cached_stop):
+            continue
+
+        return index_df, psth_arr[:, :, req_start - cached_start : req_stop - cached_start]
 
     return None
 
@@ -1925,9 +1958,9 @@ def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_windo
     superset_hit = False
     if not cache_hit and not force_refresh:
         superset_entry = _find_superset_psth_cache_entry(
-            monkey, date, unit_type, channels, time_window, key_parts['h5_fingerprint'], pairs_sorted, cache_root)
+            monkey, date, unit_type, h5_path, channels, time_window, key_parts['h5_fingerprint'], pairs_sorted, cache_root)
         if superset_entry is not None:
-            _, index_df, psth_arr = superset_entry
+            index_df, psth_arr = superset_entry
             superset_hit = True
 
     if cache_hit:
