@@ -362,18 +362,26 @@ def rolling_std(x, window):
 
 
 def time_window2bin_indices(plot_window, psth_bins):
-    
-    if plot_window[0] < np.min(psth_bins):
+
+    # Small absolute tolerance to absorb floating-point drift in psth_bins
+    # (e.g. accumulated error from repeatedly adding bin width) that would
+    # otherwise make a boundary value that's really exactly on the requested
+    # window fail a strict >=/<= comparison and shift the selected range by
+    # a full bin. Scaled to bin spacing so it can never bridge a genuine gap
+    # between adjacent bins:
+    tol = np.min(np.diff(psth_bins)) * 1e-6 if len(psth_bins) > 1 else 1e-9
+
+    if plot_window[0] < np.min(psth_bins) - tol:
         raise AssertionError('Requested plot window {} extends before first available sample {} in input data.'.format(plot_window, psth_bins[0]))
-    if plot_window[1] > np.max(psth_bins):        
+    if plot_window[1] > np.max(psth_bins) + tol:
         raise AssertionError('Requested plot window extends after last available sample in input data.')
-    
-    geq_lower_index = np.argwhere(psth_bins >= plot_window[0])
-    first_index = np.min(geq_lower_index)    
-    
-    leq_greater_index = np.argwhere(psth_bins <= plot_window[1])    
+
+    geq_lower_index = np.argwhere(psth_bins >= plot_window[0] - tol)
+    first_index = np.min(geq_lower_index)
+
+    leq_greater_index = np.argwhere(psth_bins <= plot_window[1] + tol)
     last_index = np.max(leq_greater_index)
-        
+
     return [first_index, last_index]
 
 
