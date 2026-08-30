@@ -2006,6 +2006,34 @@ def _fetch_one_session_psth(monkey, date, group, unit_type, channels, time_windo
     curr_out = group.copy()
     curr_out['psth'] = [psth_arr[i] for i in row_order]
 
+    # `group`'s own 'psth_bins' column (if present) is per-trial metadata
+    # inherited from the *unfiltered* session trial_params -- i.e. the full
+    # recorded epoch, regardless of `time_window`. If time_window narrowed
+    # what's actually in `psth` above, that column is now stale (still
+    # describing the full epoch) and must be replaced with the bin edges
+    # that actually correspond to the fetched/cached `psth` array, or
+    # downstream code slicing/labeling by 'psth_bins' will misalign against
+    # the now-shorter psth arrays. No correction needed when time_window is
+    # None, since 'psth' then still spans the full epoch 'psth_bins' already
+    # describes. Recomputed independently from the H5's own attrs (cheap,
+    # attrs-only) rather than threaded through each cache-hit/miss branch
+    # above, so it's correct regardless of which branch produced psth_arr.
+    #
+    # +1 on the upper slice bound: the full-epoch 'psth_bins' has N+1 edges
+    # for N data bins (verified: len(h5.attrs['psth_bins']) ==
+    # full_psth.shape[-1] + 1), and downstream code (e.g.
+    # trial_avg_psths.ipynb's "Verify PSTH bins" cell) unconditionally drops
+    # the last edge via psth_bins[:-1] before comparing against psth's
+    # column count. Slicing to bin_indices[1] (matching psth_arr's column
+    # count exactly) would leave that convention one edge short after the
+    # downstream trim:
+    if time_window is not None and 'psth_bins' in curr_out.columns:
+        with h5py.File(h5_path, 'r') as h5:
+            full_psth_bins = h5.attrs['psth_bins']
+        bin_indices = time_window2bin_indices(time_window, full_psth_bins)
+        psth_bins_actual = full_psth_bins[bin_indices[0]:bin_indices[1] + 1]
+        curr_out['psth_bins'] = [psth_bins_actual] * len(curr_out)
+
     # chs_meta is a cheap PyTables-format read, always re-fetched fresh
     # regardless of cache hit/miss (no need to cache it separately):
     ch_meta_result = None
