@@ -10,6 +10,7 @@ from numpy.matlib import repmat
 import openpyxl
 import datetime
 import warnings
+import tables
 from .utils_meta import get_recording_path, resolve_ks_dir, resolve_ks_h5_path
 
 def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, typ=0,
@@ -135,12 +136,18 @@ def generate_imro_table(length='short', parity='columnar', short_bank=0, n=384, 
     
 
 def h5_2_ch_meta(h5path):
-    zero_coords = pd.read_hdf(h5path, 'zero_coordinates')
-    imro_tbl = pd.read_hdf(h5path, 'imro_table')
-    imro_tbl['ch_idx_glx'] = imro_tbl.index
-    
-    # Assign monkey and date if possible:
-    trial_df = pd.read_hdf(h5path, 'trial_params_short')
+    # Opening h5path via pd.read_hdf (PyTables) makes PyTables enumerate the file's
+    # root-level HDF5 attributes, including 'scenefile_by_stim_mat' -- an HDF5 enum
+    # type PyTables can't map to a native dtype, and unrelated to the datasets read
+    # here -- which would otherwise emit a DataTypeWarning on every call:
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=tables.exceptions.DataTypeWarning)
+        zero_coords = pd.read_hdf(h5path, 'zero_coordinates')
+        imro_tbl = pd.read_hdf(h5path, 'imro_table')
+        imro_tbl['ch_idx_glx'] = imro_tbl.index
+
+        # Assign monkey and date if possible:
+        trial_df = pd.read_hdf(h5path, 'trial_params_short')
     if len(trial_df.monkey.unique())==1:
         monkey = trial_df.iloc[0].monkey
         zero_coords['monkey'] = monkey
