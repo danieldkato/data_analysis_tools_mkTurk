@@ -418,7 +418,7 @@ def run_kilosort(monkey: str, date: str, dredge: bool = True, override: bool = F
         # Export per-unit spike times + KSLabel for analyze_bystim(source='kilosort').
         # Done after staging cleanup, only on a complete sort.
         export_spike_times_per_unit(monkey, date, overwrite=override)
-        # Save unit quality metrics (presence_ratios / amplitude_cutoffs / viol_rates)
+        # Save unit quality metrics (presence_ratios_J / amplitude_cutoffs_J / viol_rates_J)
         # for good-single-unit selection (see quality_metrics.is_good_unit).
         run_quality_metrics(monkey, date, overwrite=override)
         # Persist fr / contamPct / template_depths / temp_chan_amps (standard Phy/KS
