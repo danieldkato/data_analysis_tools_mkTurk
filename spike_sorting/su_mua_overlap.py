@@ -11,8 +11,10 @@ All pairs are computed, not just each unit's peak channel: distant channels supp
 empirical baseline, which lands on the analytic Poisson expectation
 `1 - exp(-2*tol*rate)` and so needs no shuffle control.
 
-Channels are identified by SpikeGLX id throughout, matching the MUA filenames and
-kilosort4/channel_map.npy. No depth-rank conversion is applied.
+Channels are identified by SpikeGLX id throughout, matching the MUA filenames, and no
+depth-rank conversion is applied. `peak_channel` is a glx id too, so it indexes the matrix
+columns directly -- but the SU waveform cache stores a DEPTH RANK under that same name, so
+convert before comparing against it.
 
 The result is cached beside the session's single-unit HDF5, under processed_h5.
 
@@ -51,6 +53,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ..make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from ..npix import get_site_coords, h5_2_ch_meta, map_ks_chans_to_depth_idx
 from ..utils_meta import init_dirs, resolve_ks_h5_path
 from .staging import find_recording_dir
 
@@ -69,7 +72,8 @@ def load_mua_times(mua_dir: Path, glx: int) -> npt.NDArray[np.float64]:
     Load one channel's threshold-crossing times, collapsed to a sorted 1-D array.
 
     Each detected event stores the timestamps of both its negative and positive peak;
-    sign_label picks which one is the spike's extremum. This mirrors utils_ephys.load_data
+    the sign label picks which one is the spike's extremum, read from either the current
+    ch*_sign_label.npy or the older ch*_sls.npy. This mirrors utils_ephys.load_data
     but takes the per-spike argmin/argmax -- load_data indexes with a stray [0], applying
     one spike's column choice to every spike on the channel.
 
@@ -87,7 +91,13 @@ def load_mua_times(mua_dir: Path, glx: int) -> npt.NDArray[np.float64]:
     """
     ts = np.load(mua_dir / 'ch{:0>3d}_ts.npy'.format(glx))
     pks = np.load(mua_dir / 'ch{:0>3d}_pks.npy'.format(glx))
-    sl = np.load(mua_dir / 'ch{:0>3d}_sign_label.npy'.format(glx))
+    # Older sessions name the sign labels _sls.npy; get_MUA switched to _sign_label.npy
+    # partway through, so both spellings are live on the locker (utils_ephys.load_data
+    # falls back the same way).
+    sl_path = mua_dir / 'ch{:0>3d}_sign_label.npy'.format(glx)
+    if not sl_path.exists():
+        sl_path = mua_dir / 'ch{:0>3d}_sls.npy'.format(glx)
+    sl = np.load(sl_path)
 
     neg = np.flatnonzero(sl == 1)
     pos = np.flatnonzero(sl == 0)
@@ -125,7 +135,7 @@ def load_unit_times(ks_dir: Path) -> list[npt.NDArray[np.float64]]:
     return [spike_times[spike_clusters == u] for u in range(n_units)]
 
 
-def peak_channels(ks_dir: Path) -> npt.NDArray[np.int64]:
+def peak_channels(ks_dir: Path, h5path: str | Path) -> npt.NDArray[np.int64]:
     """
     SpikeGLX channel id of each unit's largest-amplitude template channel.
 
@@ -136,16 +146,29 @@ def peak_channels(ks_dir: Path) -> npt.NDArray[np.int64]:
     ----------
     ks_dir : pathlib.Path
         Raw kilosort4 output directory.
+    h5path : str or pathlib.Path
+        Session HDF5, read for the probe geometry that locates each Kilosort channel.
 
     Returns
     -------
     numpy.ndarray
-        Glx channel id per unit, indexed by Kilosort template id.
+        Glx channel id per unit, indexed by Kilosort template id. Note this is the glx id,
+        matching the matrix's channel axis -- NOT the depth rank that the SU waveform cache
+        stores under the same name. Convert before comparing the two.
     """
     templates = np.load(ks_dir / 'templates.npy')
-    # channel_map maps Kilosort's channel axis (which drops dead sites) back to glx ids.
-    channel_map = np.squeeze(np.load(ks_dir / 'channel_map.npy'))
-    return channel_map[np.argmax(np.ptp(templates, axis=1), axis=1)]
+    channel_positions = np.load(ks_dir / 'channel_positions.npy')
+
+    # channel_map is NOT the glx mapping: on a 2-bank probe it is a plain arange while
+    # channel_positions interleaves the banks (y = 0, 3840, 3860, 20, ...), so indexing it
+    # puts roughly half the units in the wrong bank, mm away from their real site. Only a
+    # channel's physical y locates it, which is what map_ks_chans_to_depth_idx matches on.
+    ks_to_depth = map_ks_chans_to_depth_idx(h5path, channel_positions[:, 1])
+    glx_by_depth = (get_site_coords(*h5_2_ch_meta(h5path))
+                    .sort_values('ch_idx_depth')['ch_idx_glx'].to_numpy())
+
+    peak_ks = np.argmax(np.ptp(templates, axis=1), axis=1)
+    return glx_by_depth[ks_to_depth[peak_ks]]
 
 
 def count_matches(st: npt.NDArray[np.float64], mua_ts: npt.NDArray[np.float64]) -> int:
@@ -260,7 +283,7 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
         'n_mua': n_mua,
         'unit_ids': np.arange(n_units, dtype=np.int32),
         'channel_ids': glx_ids.astype(np.int32),
-        'peak_channel': peak_channels(ks_dir).astype(np.int32),
+        'peak_channel': peak_channels(ks_dir, resolve_ks_h5_path(monkey, date)).astype(np.int32),
         'duration_s': np.asarray(t_max, dtype=np.float64),
         'tol_s': np.asarray(TOL_S, dtype=np.float64),
     }
@@ -341,7 +364,9 @@ if __name__ == '__main__':
     parser.add_argument('--date', required=True, help='YYYYMMDD')
     parser.add_argument('--n-jobs', type=int, default=-1, help='worker processes (-1 = all cores)')
     parser.add_argument('--skip-existing', action='store_true')
+    parser.add_argument('--override', action='store_true',
+                        help='recompute even when the npz exists (wins over --skip-existing)')
     args = parser.parse_args()
 
     compute_overlap_matrix(args.monkey, args.date, n_jobs=args.n_jobs,
-                         skip_existing=args.skip_existing)
+                           skip_existing=args.skip_existing and not args.override)
