@@ -22,6 +22,8 @@ Counts, not fractions, are cached, so both normalizations stay available:
 
     n_match / n_su[:, None]     fraction of the unit found on the channel
     n_match / n_mua[None, :]    fraction of the channel contributed by the unit
+    n_explained / n_mua         fraction of the channel explained by ANY unit (a union, so
+                                NOT the column sum of n_match, which double-counts)
 
 The two are not interchangeable. The MUA detector has a hard dead time (~0.333 ms) and
 emits one event per crossing, so it subsamples heavily; a unit firing faster than its
@@ -201,24 +203,43 @@ def count_matches(st: npt.NDArray[np.float64], mua_ts: npt.NDArray[np.float64]) 
 
 # Set once per worker by _init_worker, so the spike trains are not re-pickled per task.
 _UNIT_ST: list[npt.NDArray[np.float64]] = []
+_ALL_ST: npt.NDArray[np.float64] = np.empty(0)
 _MUA_DIR: Path = Path()
 
 
 def _init_worker(unit_st: list[npt.NDArray[np.float64]], mua_dir: Path) -> None:
     """Seed each worker once with the unit spike trains, so they are not re-pickled per task."""
-    global _UNIT_ST, _MUA_DIR
+    global _UNIT_ST, _ALL_ST, _MUA_DIR
     _UNIT_ST = unit_st
     _MUA_DIR = mua_dir
+    # Sorted union of every unit's spikes, for the per-channel 'any unit' count.
+    _ALL_ST = np.sort(np.concatenate(unit_st)) if unit_st else np.empty(0)
 
 
-def _match_channel(glx: int) -> tuple[int, npt.NDArray[np.int32], int, float]:
-    """Match one channel against every unit. Returns (glx, counts, n_crossings, last_time)."""
+def _match_channel(glx: int) -> tuple[int, npt.NDArray[np.int32], int, int, float]:
+    """Match one channel against every unit.
+
+    Returns (glx, counts, n_crossings, n_explained, last_time), where n_explained counts the
+    channel's crossings lying within TOL_S of ANY unit's spike. That is a set union, so it is
+    NOT the column sum of `counts`: a crossing matched by two units is counted once here and
+    twice there (column sums routinely exceed n_crossings).
+    """
     mua_ts = load_mua_times(_MUA_DIR, glx)
 
     counts: npt.NDArray[np.int32] = np.fromiter(
         (count_matches(st, mua_ts) for st in _UNIT_ST),
         dtype=np.int32, count=len(_UNIT_ST))
-    return glx, counts, mua_ts.size, float(mua_ts[-1]) if mua_ts.size else 0.0
+
+    explained = 0
+    if mua_ts.size and _ALL_ST.size:
+        idx = np.searchsorted(_ALL_ST, mua_ts)
+        best = np.full(mua_ts.shape, np.inf)
+        for off in (-1, 0):
+            neighbour = _ALL_ST[np.clip(idx + off, 0, _ALL_ST.size - 1)]
+            best = np.minimum(best, np.abs(neighbour - mua_ts))
+        explained = int(np.count_nonzero(best <= TOL_S))
+
+    return glx, counts, mua_ts.size, explained, float(mua_ts[-1]) if mua_ts.size else 0.0
 
 
 def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.NDArray[Any]]:
@@ -241,7 +262,7 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
     -------
     dict
         Arrays keyed as described in the module docstring: n_match (n_units, n_channels),
-        n_su, n_mua, unit_ids, peak_channel, duration_s, tol_s, channel_ids. Channel axes
+        n_su, n_mua, n_explained, unit_ids, peak_channel, duration_s, tol_s, channel_ids. Axes
         are in SpikeGLX channel id order; unit axes are in Kilosort template id.
     """
     data_path_list, _, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
@@ -258,6 +279,7 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
 
     n_match: npt.NDArray[np.int32] = np.zeros((n_units, n_chans), dtype=np.int32)
     n_mua: npt.NDArray[np.int32] = np.zeros(n_chans, dtype=np.int32)
+    n_explained: npt.NDArray[np.int32] = np.zeros(n_chans, dtype=np.int32)
     t_max = 0.0
 
     # One task per channel: each worker reads a single MUA file and sweeps it against every
@@ -266,12 +288,13 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
     workers = os.cpu_count() if n_jobs == -1 else n_jobs
     with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
                              initargs=(unit_st, mua_dir)) as pool:
-        for glx, counts, n_cross, last_t in pool.map(_match_channel,
-                                                     [int(g) for g in glx_ids],
-                                                     chunksize=4):
+        for glx, counts, n_cross, n_expl, last_t in pool.map(_match_channel,
+                                                             [int(g) for g in glx_ids],
+                                                             chunksize=4):
             col = col_of_glx[glx]
             n_match[:, col] = counts
             n_mua[col] = n_cross
+            n_explained[col] = n_expl
             t_max = max(t_max, last_t)
 
     n_su = np.array([st.size for st in unit_st], dtype=np.int32)
@@ -281,6 +304,7 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
         'n_match': n_match,
         'n_su': n_su,
         'n_mua': n_mua,
+        'n_explained': n_explained,
         'unit_ids': np.arange(n_units, dtype=np.int32),
         'channel_ids': glx_ids.astype(np.int32),
         'peak_channel': peak_channels(ks_dir, resolve_ks_h5_path(monkey, date)).astype(np.int32),
