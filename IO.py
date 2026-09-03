@@ -915,11 +915,15 @@ def standardize_col_types(df):
 
             df.loc[df[col]=='true', col] = 1
 
-            # If all floats are NaN, make everything string:
+            # If all floats are NaN, make everything string. Missing entries are
+            # left as None rather than stringified: astype(str) renders them as the
+            # literal 'nan', which format='table' happens to read back as NaN but
+            # format='fixed' faithfully returns as a string, breaking pd.isna()
+            # checks downstream depending on which format the file was written in.
             floats = np.where([type(x)==float for x in df[col]])[0]
             nans = np.where(df[col].isna())[0]
             if len(floats)==len(nans) and np.all(floats==nans):
-                df[col]= df[col].astype(str)
+                df[col] = df[col].map(lambda x : None if pd.isna(x) else str(x))
     
             # Otherwise, convert everything to float:
             else: 
@@ -954,7 +958,8 @@ def standardize_col_types(df):
             if scalar_mask.any() and coerced[scalar_mask].notna().all():
                 df[col] = coerced
             else:
-                df[col] = df[col].apply(lambda x : '' if _is_nonscalar(x) else x).astype(str)
+                df[col] = df[col].map(
+                    lambda x : '' if _is_nonscalar(x) else (None if pd.isna(x) else str(x)))
 
     return df
 

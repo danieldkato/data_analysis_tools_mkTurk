@@ -278,7 +278,7 @@ def resolve_ks_dir(monkey, date):
     return find_recording_dir(Path(data_path_list[0])) / 'kilosort4'
 
 
-def resolve_ks_h5_path(monkey, date, output_base=None):
+def resolve_ks_h5_path(monkey, date, output_base=None, suffix=''):
     """
     Resolve the single-unit session HDF5 path for a session.
 
@@ -292,6 +292,10 @@ def resolve_ks_h5_path(monkey, date, output_base=None):
         output_base (str, optional): Root directory of the single-unit session
             HDF5s. Defaults to <ENGRAM_PATH>/processed_h5, matching
             process_ks_data()'s DEFAULT_OUTPUT_BASE.
+        suffix (str, optional): Appended to the filename stem, matching
+            process_ks_data()'s `suffix`. Only needed to address a file written
+            under a non-default suffix; the default '' gives the canonical path
+            every reader uses.
 
     Returns:
         pathlib.Path: Path to the session's single-unit HDF5.
@@ -312,7 +316,7 @@ def resolve_ks_h5_path(monkey, date, output_base=None):
     # one; see process_ks_data(), which writes it.
     recording_dir = Path(str(save_out_path_list[0])).name
 
-    return Path(output_base, monkey, recording_dir, 'ks', date + '.h5')
+    return Path(output_base, monkey, recording_dir, 'ks', date + suffix + '.h5')
 
 
 def find_channels(directory, prefix=None):
