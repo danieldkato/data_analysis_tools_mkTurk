@@ -895,6 +895,23 @@ def standardize_col_types(df):
     # when saving with pd.to_hdf) then take appropriate steps to make all of one
     # type
     
+    # Normalize the literal string 'nan' (some behavior fields arrive already
+    # stringified) to a real missing value: format='table' coerces it back to NaN
+    # on read but format='fixed' returns it verbatim, breaking pd.isna(). Skip
+    # numeric-valued columns, which the astype(float) branch below already parses
+    # correctly and which stringify instead -- losing every real value -- if
+    # converted here first.
+    for col in df.columns:
+        if df[col].dtype != object:
+            continue
+        is_nan_str = df[col] == 'nan'
+        if not is_nan_str.any():
+            continue
+        rest = df.loc[~is_nan_str, col].dropna()
+        if len(rest) and pd.to_numeric(rest, errors='coerce').notna().all():
+            continue  # numeric-valued; leave it to the astype(float) path
+        df.loc[is_nan_str, col] = np.nan
+
     # Find columns with more than one datatype:
     cols = df.columns
     f = lambda y : len(np.unique([str(type(x)) for x in y])) # Define function for counting how many datatypes there are in a column
