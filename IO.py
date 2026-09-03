@@ -22,8 +22,12 @@ from .stim_info import filter_stim_trials, expand_classes, get_class_trials, cre
 from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords, h5_2_ch_meta
 from .spike_sorting.quality_metrics import build_unit_info_dfs
 from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
-from mkutils_ddk.env import get_engram_drive
-from mkanalysis.general import matches_any_predicate
+from .make_engram_path import ENGRAM_PATH
+try:
+    from mkanalysis.general import matches_any_predicate
+except ImportError:
+    matches_any_predicate = None
+    warnings.warn('Failed to import mkanalysis module.')
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -1579,12 +1583,10 @@ def find_h5_path(monkey, date, unit_type='mua'):
             print('H5 file not found for {}, {}'.format(monkey, date))
             return None
 
-    #engram_drive = get_engram_drive()
-
     hostname = socket.gethostname()
     try:
         if 'rc.zi.columbia.edu' in hostname:
-            engram_drive = get_engram_drive()
+            engram_drive = ENGRAM_PATH
             base_data_path = os.path.join(engram_drive, 'Data')
             folder_level_offset = 4
             recording_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
@@ -1624,6 +1626,8 @@ def _build_fetch_flt(misc_flt, group_defs):
             return False
         if len(group_predicates) == 0:
             return True
+        if matches_any_predicate is None:
+            raise ImportError('group_defs filtering requires the mkanalysis package, which failed to import.')
         return matches_any_predicate(row, group_predicates)
 
     return flt
