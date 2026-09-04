@@ -22,8 +22,12 @@ from .stim_info import filter_stim_trials, expand_classes, get_class_trials, cre
 from .npix import get_sess_metadata_path, extract_imro_table, get_site_coords, h5_2_ch_meta
 from .spike_sorting.quality_metrics import build_unit_info_dfs
 from .general import time_window2bin_indices, remove_duplicate_rsvp_indices, rsvp_from_df, abs2rel_ind
-from mkutils_ddk.env import get_engram_drive
-from mkanalysis.general import matches_any_predicate
+from .make_engram_path import ENGRAM_PATH
+try:
+    from mkanalysis.general import matches_any_predicate
+except ImportError:
+    matches_any_predicate = None
+    warnings.warn('Failed to import mkanalysis module.')
 try:
     from analysis_metadata.analysis_metadata import Metadata, write_metadata
 except ImportError:
@@ -891,6 +895,23 @@ def standardize_col_types(df):
     # when saving with pd.to_hdf) then take appropriate steps to make all of one
     # type
     
+    # Normalize the literal string 'nan' (some behavior fields arrive already
+    # stringified) to a real missing value: format='table' coerces it back to NaN
+    # on read but format='fixed' returns it verbatim, breaking pd.isna(). Skip
+    # numeric-valued columns, which the astype(float) branch below already parses
+    # correctly and which stringify instead -- losing every real value -- if
+    # converted here first.
+    for col in df.columns:
+        if df[col].dtype != object:
+            continue
+        is_nan_str = df[col] == 'nan'
+        if not is_nan_str.any():
+            continue
+        rest = df.loc[~is_nan_str, col].dropna()
+        if len(rest) and pd.to_numeric(rest, errors='coerce').notna().all():
+            continue  # numeric-valued; leave it to the astype(float) path
+        df.loc[is_nan_str, col] = np.nan
+
     # Find columns with more than one datatype:
     cols = df.columns
     f = lambda y : len(np.unique([str(type(x)) for x in y])) # Define function for counting how many datatypes there are in a column
@@ -911,11 +932,15 @@ def standardize_col_types(df):
 
             df.loc[df[col]=='true', col] = 1
 
-            # If all floats are NaN, make everything string:
+            # If all floats are NaN, make everything string. Missing entries are
+            # left as None rather than stringified: astype(str) renders them as the
+            # literal 'nan', which format='table' happens to read back as NaN but
+            # format='fixed' faithfully returns as a string, breaking pd.isna()
+            # checks downstream depending on which format the file was written in.
             floats = np.where([type(x)==float for x in df[col]])[0]
             nans = np.where(df[col].isna())[0]
             if len(floats)==len(nans) and np.all(floats==nans):
-                df[col]= df[col].astype(str)
+                df[col] = df[col].map(lambda x : None if pd.isna(x) else str(x))
     
             # Otherwise, convert everything to float:
             else: 
@@ -950,7 +975,8 @@ def standardize_col_types(df):
             if scalar_mask.any() and coerced[scalar_mask].notna().all():
                 df[col] = coerced
             else:
-                df[col] = df[col].apply(lambda x : '' if _is_nonscalar(x) else x).astype(str)
+                df[col] = df[col].map(
+                    lambda x : '' if _is_nonscalar(x) else (None if pd.isna(x) else str(x)))
 
     return df
 
@@ -1579,12 +1605,10 @@ def find_h5_path(monkey, date, unit_type='mua'):
             print('H5 file not found for {}, {}'.format(monkey, date))
             return None
 
-    #engram_drive = get_engram_drive()
-
     hostname = socket.gethostname()
     try:
         if 'rc.zi.columbia.edu' in hostname:
-            engram_drive = get_engram_drive()
+            engram_drive = ENGRAM_PATH
             base_data_path = os.path.join(engram_drive, 'Data')
             folder_level_offset = 4
             recording_path = get_recording_path(Path(base_data_path), Path(monkey), date, depth=4)[0]
@@ -1624,6 +1648,8 @@ def _build_fetch_flt(misc_flt, group_defs):
             return False
         if len(group_predicates) == 0:
             return True
+        if matches_any_predicate is None:
+            raise ImportError('group_defs filtering requires the mkanalysis package, which failed to import.')
         return matches_any_predicate(row, group_predicates)
 
     return flt
