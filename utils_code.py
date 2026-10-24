@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
-from utils_mkturk import gen_scene_df, gen_short_scene_info
-from make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+from .utils_mkturk import gen_scene_df, gen_short_scene_info
+from .make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
 
 def setup_paths():
     """Setup data paths based on hostname"""

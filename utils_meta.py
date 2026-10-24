@@ -8,7 +8,8 @@ import re
 from natsort import os_sorted
 import pickle
 import json
-from utils_mkturk import gen_scene_df, gen_short_scene_info
+from .utils_mkturk import gen_scene_df, gen_short_scene_info
+#from data_analysis_tools_mkTurk.utils_mkturk import * 
 from SpikeGLX_Datafile_Tools.Python.DemoReadSGLXData.readSGLX import readMeta 
 
 def get_recording_path(base_data_path, monkey, date,depth = 4):
@@ -20,7 +21,7 @@ def get_recording_path(base_data_path, monkey, date,depth = 4):
     for long_path in long_paths:
         sub_lists = [x[0] for x in os.walk(long_path) if len(Path(x[0]).parents)-len(Path(base_data_path).parents) ==depth]
         for s in sub_lists:
-            result = re.search('\Dep(.*?)\_', Path(s).name)
+            result = re.search(r'\Dep(.*?)\_', Path(s).name)
             if result is not None and 'dk' not in Path(s).name:
                 depth_start = result.group(1).split('-')[0]
                 depth_end = result.group(1).split('-')[1]
@@ -134,17 +135,16 @@ def get_coords_sess(base_data_path, monkey, date):
     # returns hole id, ap, dv, ml coordinates, angle, and depth of recording
 
     data_path = get_recording_path(base_data_path, monkey, date,depth = 4)[0]
-
     name = Path(data_path).name
     
     # Define field names and corresponding search patterns:
-    patterns = {'hole_id' : '_H\d+\.*\d*_', 
-                'penetration' : '_P\d+\.*\d*_', 
-                'AP' : 'AP-{0,1}\d+\.*\d*', 
-                'DV' : 'DV-{0,1}\d+\.*\d*', 
-                'ML' : 'ML-{0,1}\d+\.*\d*', 
-                'Ang'  : '[^H]Ang-*\d+\.*\d', 
-                'HAng' : 'HAng-*\d+\.*\d*'}
+    patterns = {'hole_id' : r'_H\d+\.*\d*_', 
+                'penetration' : r'_P\d+\.*\d*_', 
+                'AP' : r'AP-{0,1}\d+\.*\d*', 
+                'DV' : r'DV-{0,1}\d+\.*\d*', 
+                'ML' : r'ML-{0,1}\d+\.*\d*', 
+                'Ang'  : r'[^H]Ang\d+\.*\d', 
+                'HAng' : r'HAng\d+\.*\d*'}
     regex_lut = pd.DataFrame({'regex':patterns.values()}, index=patterns.keys())
     
     # Iterate over numeric fields (except depth):
@@ -152,26 +152,26 @@ def get_coords_sess(base_data_path, monkey, date):
     for idx, row in regex_lut.iterrows():
         matches = re.findall(row.regex, name)
         if len(matches) == 1:
-            val = float(re.search('-{0,1}\d+\.*\d*', matches[0]).group())
+            val = float(re.search(r'-{0,1}\d+\.*\d*', matches[0]).group())
         else:
             val = None
         zero_coord_series[idx] = val
 
     # Find depth (requires separate treatment from other numeric parameters bc
     # filenames include both starting and stop depth):
-    depth_regex = 'Dep\d+-\d+'
+    depth_regex = r'Dep\d+-\d+'
     depth_matches = re.findall(depth_regex, name)
     if len(depth_matches) == 1:
-        depth_vals = re.findall('\d+', depth_matches[0])
+        depth_vals = re.findall(r'\d+', depth_matches[0])
         depth = float(depth_vals[1])
     else:
         depth = None
     zero_coord_series['depth'] = depth
         
     # Find brain hemisphere:
-    hemisphere_str = re.findall('_(L|R)_', name)
+    hemisphere_str = re.findall(r'_(L|R)_', name)
     if len(hemisphere_str) == 1:
-        hemisphere = re.search('(L|R)', hemisphere_str[0]).group()
+        hemisphere = re.search(r'(L|R)', hemisphere_str[0]).group()
     else:
         hemisphere = None
     zero_coord_series['hemisphere'] = hemisphere
@@ -249,6 +249,72 @@ def init_dirs(base_data_path, monkey, date, base_save_out_path):
     return data_path, save_out_path, plot_save_out_path
 
 
+def resolve_ks_dir(monkey, date):
+    """
+    Resolve the raw Kilosort4 output directory for a session.
+
+    This is the directory Kilosort itself wrote (templates.npy,
+    channel_positions.npy, spike_times.npy, the cluster_*.tsv files), under the
+    Data root -- NOT the save-out kilosort4 dir holding the derived per-unit
+    metrics. For the latter, see spike_sorting.quality_metrics.
+
+    Args:
+        monkey (str): Monkey identifier.
+        date (str): Recording date (YYYYMMDD).
+
+    Returns:
+        pathlib.Path: Path to the session's raw kilosort4 directory.
+
+    Raises:
+        ValueError: If the monkey/date does not resolve to exactly one recording.
+    """
+    from .make_engram_path import BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+    from .spike_sorting.staging import find_recording_dir
+
+    data_path_list, _, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    if len(data_path_list) != 1:
+        raise ValueError('Multiple or no recordings found for {}, {}'.format(monkey, date))
+
+    return find_recording_dir(Path(data_path_list[0])) / 'kilosort4'
+
+
+def resolve_ks_h5_path(monkey, date, output_base=None):
+    """
+    Resolve the single-unit session HDF5 path for a session.
+
+    Same resolution as spike_sorting.process_ks_data(), which is what writes this
+    file. This is the Kilosort (single-unit) HDF5; the MUA session HDF5 lives
+    elsewhere and is not resolved here.
+
+    Args:
+        monkey (str): Monkey identifier.
+        date (str): Recording date (YYYYMMDD).
+        output_base (str, optional): Root directory of the single-unit session
+            HDF5s. Defaults to <ENGRAM_PATH>/processed_h5, matching
+            process_ks_data()'s DEFAULT_OUTPUT_BASE.
+
+    Returns:
+        pathlib.Path: Path to the session's single-unit HDF5.
+
+    Raises:
+        ValueError: If the monkey/date does not resolve to exactly one recording.
+    """
+    from .make_engram_path import ENGRAM_PATH, BASE_DATA_PATH, BASE_SAVE_OUT_PATH
+
+    if output_base is None:
+        output_base = ENGRAM_PATH / 'processed_h5'
+
+    _, save_out_path_list, _ = init_dirs(BASE_DATA_PATH, monkey, date, BASE_SAVE_OUT_PATH)
+    if len(save_out_path_list) != 1:
+        raise ValueError('Multiple or no recordings found for {}, {}'.format(monkey, date))
+
+    # The HDF5 is filed under the save-out recording dir name, not the raw data
+    # one; see process_ks_data(), which writes it.
+    recording_dir = Path(str(save_out_path_list[0])).name
+
+    return Path(output_base, monkey, recording_dir, 'ks', date + '.h5')
+
+
 def find_channels(directory, prefix=None):
     """
     Find channels for which input directory contains preprocessed data. Assumes 
@@ -273,7 +339,7 @@ def find_channels(directory, prefix=None):
         prefix = ''
 
     # Define regex:
-    regex = 'ch\d{3}' + prefix
+    regex = r'ch\d{3}' + prefix
 
     # List directory contents:
     filenames = os.listdir(directory)
@@ -286,7 +352,42 @@ def find_channels(directory, prefix=None):
     return chans
 
 
-def get_all_metadata_sess(preprocessed_data_path):
+def find_units(directory: str, suffix: str = '_psth_stim') -> np.ndarray:
+    """
+    Find sorted-unit (Kilosort cluster) indices for which input directory
+    contains preprocessed data. Unit analogue of find_channels(): assumes the
+    directory holds one file per unit named 'clu<nnn>_psth_stim', as written by
+    analyze_bystim() for source='kilosort'. Cluster ids are zero-padded to a
+    minimum of 3 digits but may be wider, so this matches a variable-width id.
+
+    Parameters
+    ----------
+    directory : str
+        Path to directory to search (e.g. <save_out>/kilosort4).
+
+    suffix : str, optional
+        String that must immediately follow the unit number, used to restrict
+        the search to PSTH files. The default is '_psth_stim'.
+
+    Returns
+    -------
+    units : numpy.ndarray
+        Sorted array of cluster ids in the directory.
+    """
+    # Match 'clu' followed by a variable-width id and the requested suffix:
+    regex = r'clu(\d+)' + re.escape(suffix)
+
+    # List directory contents:
+    filenames = os.listdir(directory)
+
+    # Extract cluster ids from matching filenames:
+    indices = [int(re.search(regex, x).group(1)) for x in filenames if re.search(regex, x) is not None]
+    units = np.unique(indices)
+
+    return units
+
+
+def get_all_metadata_sess(preprocessed_data_path, stim_meta_dir=None):
 
     files = os.listdir(preprocessed_data_path)
 
@@ -296,9 +397,14 @@ def get_all_metadata_sess(preprocessed_data_path):
 
     # Get stim metadata:
     psth_stim_meta_regex = 'psth_stim_meta'
+    stim_meta_path_dir = preprocessed_data_path
     psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in files if re.search(psth_stim_meta_regex,x) is not None]
+    # Fall back to stim_meta_dir (e.g. the kilosort4 subdir) for ks-only sessions:
+    if not psth_stim_meta_matches and stim_meta_dir is not None and os.path.isdir(stim_meta_dir):
+        psth_stim_meta_matches = [re.search(psth_stim_meta_regex,x).group() for x in os.listdir(stim_meta_dir) if re.search(psth_stim_meta_regex,x) is not None]
+        stim_meta_path_dir = stim_meta_dir
     stim_meta_file = psth_stim_meta_matches[0] # < Assume metadata is the same for all channels
-    stim_meta_path = os.path.join(preprocessed_data_path, stim_meta_file) # < Hack; assuming this always exists
+    stim_meta_path = os.path.join(stim_meta_path_dir, stim_meta_file) # < Hack; assuming this always exists
     stim_meta = pickle.load(open(stim_meta_path, 'rb'))
 
     # Get scenefile metadata:
@@ -321,6 +427,7 @@ def scenefile2rsvp_inds(data_dicts, scenefile):
 
     return A
 
+
 # read imroTbl 
 def read_imroTbl(meta):
     n_chans = int(meta['nSavedChans'])-1
@@ -337,6 +444,7 @@ def read_imroTbl(meta):
 
     return arr 
 
+
 def read_snsChanMap(meta):
     n_chans = int(meta['nSavedChans'])-1
     snsChanMap = re.findall(r'([0-9]*;[0-9]*:[0-9]*)',
@@ -350,6 +458,7 @@ def read_snsChanMap(meta):
 
     return arr 
 
+
 def get_chanmap(data_path):
     meta_iter = data_path.glob('*ap.meta')
     bin_iter = data_path.glob('*ap.bin')   
@@ -357,6 +466,7 @@ def get_chanmap(data_path):
     bin_path = next(bin_iter) 
 
     meta = readMeta(bin_path)
+
     if ('fileTimeSecs' in meta.keys()): 
         Fs = float(meta['imSampRate'])
         filesize = float(meta['fileSizeBytes'])
@@ -391,3 +501,4 @@ def get_chanmap(data_path):
     imroTbl = read_imroTbl(meta)
 
     return chanmap, imroTbl
+
