@@ -69,6 +69,35 @@ SAMP_RATE: int = 30000
 OVERLAP_FILENAME: str = 'su_mua_overlap.npz'
 
 
+def find_mua_dir(recording_dir: Path) -> Path:
+    """
+    Return the recording's MUA_4SD directory holding final per-channel files.
+
+    Falls back to a nested MUA_4SD (e.g. backup/MUA_4SD) when the top-level one has no
+    ch###_ts.npy, as happens when an interrupted get_MUA rerun leaves only its tmp files.
+    The search stays inside recording_dir, since the session folder also holds other
+    recordings (e.g. the _dk_g0 run) whose MUA must not be mixed in.
+
+    Parameters
+    ----------
+    recording_dir : pathlib.Path
+        The recording's imec0 directory.
+
+    Returns
+    -------
+    pathlib.Path
+        The top-level MUA_4SD when it has final files (or when no nested one does).
+    """
+    top = recording_dir / 'MUA_4SD'
+    if any(top.glob('ch[0-9][0-9][0-9]_ts.npy')):
+        return top
+    for nested in sorted(recording_dir.glob('**/MUA_4SD')):
+        if nested != top and any(nested.glob('ch[0-9][0-9][0-9]_ts.npy')):
+            print('{} has no final MUA files, using {}'.format(top, nested))
+            return nested
+    return top
+
+
 def load_mua_times(mua_dir: Path, glx: int) -> npt.NDArray[np.float64]:
     """
     Load one channel's threshold-crossing times, collapsed to a sorted 1-D array.
@@ -270,7 +299,7 @@ def overlap_matrix(monkey: str, date: str, n_jobs: int = -1) -> dict[str, npt.ND
         raise ValueError('Multiple or no recordings found for {}, {}'.format(monkey, date))
     recording_dir = find_recording_dir(Path(data_path_list[0]))
     ks_dir = recording_dir / 'kilosort4'
-    mua_dir = recording_dir / 'MUA_4SD'
+    mua_dir = find_mua_dir(recording_dir)
 
     unit_st = load_unit_times(ks_dir)
     glx_ids = np.array(sorted(int(f.name[2:5]) for f in mua_dir.glob('ch[0-9][0-9][0-9]_ts.npy')))
